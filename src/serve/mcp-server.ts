@@ -21,7 +21,7 @@ export class MemGridServer {
   constructor(projectRoot: string) {
     this.mg = new MemGrid(projectRoot);
     this.server = new Server(
-      { name: 'memgrid', version: '0.3.0' },
+      { name: 'memgrid', version: '0.4.0' },
       { capabilities: { tools: {} } },
     );
 
@@ -55,6 +55,11 @@ export class MemGridServer {
                 type: 'number',
                 description: 'How many association hops to traverse (default: 2, max: 3)',
                 default: 2,
+              },
+              semanticWeight: {
+                type: 'number',
+                description: 'Hybrid search: 0.0 = keyword only, 1.0 = semantic only (default: 0.4)',
+                default: 0.4,
               },
             },
             required: ['query'],
@@ -153,8 +158,9 @@ export class MemGridServer {
             const query = (args as any).query as string;
             const maxResults = Math.min((args as any).maxResults || 10, 20);
             const maxHops = Math.min((args as any).maxHops || 2, 3);
+            const semanticWeight = (args as any).semanticWeight ?? 0.4;
 
-            const result = await this.mg.search(query, { maxResults, maxHops });
+            const result = await this.mg.search(query, { maxResults, maxHops, semanticWeight });
             const context = this.mg.context(result);
 
             return {

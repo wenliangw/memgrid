@@ -90,4 +90,5 @@ export interface ScanOptions {
 export interface SearchOptions {
   maxResults?: number;
   maxHops?: number;
+  semanticWeight?: number;
 }

@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.3.0');
+  .version('0.4.0');
 
 program
   .command('init')
@@ -39,15 +39,17 @@ program
 
 program
   .command('search')
-  .description('Search memory grid for relevant units')
+  .description('Search memory grid for relevant units (hybrid: keyword + semantic)')
   .argument('<query>', 'Search query')
   .option('-n, --max <number>', 'Max results', '10')
   .option('-H, --hops <number>', 'Max association hops', '2')
+  .option('-s, --semantic <number>', 'Semantic weight (0.0-1.0, default: 0.4)', '0.4')
   .action(async (query, options) => {
     const mg = new MemGrid(process.cwd());
     const result = await mg.search(query, {
       maxResults: parseInt(options.max),
       maxHops: parseInt(options.hops),
+      semanticWeight: parseFloat(options.semantic),
     });
 
     console.log(mg.context(result));

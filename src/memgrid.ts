@@ -2,29 +2,35 @@ import type { MemoryUnit, ScanOptions, SearchOptions, SearchResult } from './sha
 import { FileStore } from './store/file-store.js';
 import { TypeScriptScanner } from './scanner/typescript.js';
 import { RetrieveEngine } from './retrieve/index.js';
+import { SemanticRetriever, type EmbeddingProvider, KeywordEmbeddingProvider } from './retrieve/semantic.js';
 import { LearnEngine, type TaskResult, type LearningSuggestions } from './learn/index.js';
 
 export class MemGrid {
   store: FileStore;
   scanner: TypeScriptScanner;
   retrieve: RetrieveEngine;
+  semantic: SemanticRetriever;
   learn: LearnEngine;
   projectRoot: string;
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, provider?: EmbeddingProvider) {
     this.projectRoot = projectRoot;
     this.store = new FileStore(projectRoot);
     this.scanner = new TypeScriptScanner(this.store, projectRoot);
     this.retrieve = new RetrieveEngine(this.store);
+    this.semantic = new SemanticRetriever(this.store, provider || new KeywordEmbeddingProvider());
     this.learn = new LearnEngine(this.store);
   }
 
   async init(options: ScanOptions): Promise<MemoryUnit[]> {
-    return await this.scanner.scan(options);
+    const units = await this.scanner.scan(options);
+    // Build semantic index after scan
+    await this.semantic.buildIndex();
+    return units;
   }
 
   async search(query: string, options?: SearchOptions): Promise<SearchResult> {
-    return await this.retrieve.search(query, options?.maxResults, options?.maxHops);
+    return await this.semantic.search(query, options);
   }
 
   async add(unit: Partial<MemoryUnit> & { id: string; type: MemoryUnit['type']; summary: string; content: MemoryUnit['content'] }): Promise<MemoryUnit> {
@@ -62,7 +68,7 @@ export class MemGrid {
   }
 
   context(result: SearchResult): string {
-    return this.retrieve.toContext(result);
+    return this.semantic.toContext(result);
   }
 
   async analyzeTask(task: TaskResult): Promise<LearningSuggestions> {
