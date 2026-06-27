@@ -159,7 +159,7 @@ associations:
 
 - [x] v0.1 — Core engine (scan, search, store, CLI)
 - [x] v0.2 — MCP Server (plug into any MCP-compatible tool) + tests
-- [ ] v0.3 — Auto-learning (post-task grid update)
+- [x] v0.3 — Auto-learning (post-task grid update)
 - [ ] v0.4 — Vector search (semantic similarity via embedding)
 - [ ] v0.5 — Team sharing (project vs personal layers)
 - [ ] v1.0 — Web UI + CI/CD integration
