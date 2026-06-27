@@ -158,7 +158,7 @@ associations:
 ## 🗺️ Roadmap
 
 - [x] v0.1 — Core engine (scan, search, store, CLI)
-- [ ] v0.2 — MCP Server (plug into any MCP-compatible tool)
+- [x] v0.2 — MCP Server (plug into any MCP-compatible tool) + tests
 - [ ] v0.3 — Auto-learning (post-task grid update)
 - [ ] v0.4 — Vector search (semantic similarity via embedding)
 - [ ] v0.5 — Team sharing (project vs personal layers)
