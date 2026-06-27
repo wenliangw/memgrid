@@ -143,7 +143,7 @@ export class TypeScriptScanner {
         const returnType = func.getReturnType().getText();
 
         const unit: MemoryUnit = {
-          id: `func_${funcName.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`,
+          id: `method_${this.sanitizeId(funcName)}`,
           type: 'method',
           summary: `${funcName}() — ${this.extractJsDoc(func)}`,
           source: {
@@ -195,6 +195,7 @@ export class TypeScriptScanner {
         if (!title || body.length < 50) continue;
 
         const safeTitle = title.replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 50).toLowerCase();
+        if (!safeTitle || safeTitle === '_') continue;
         const safeFile = file.replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
 
         const unit: MemoryUnit = {
@@ -257,6 +258,7 @@ export class TypeScriptScanner {
       if (!fs.existsSync(dir)) return;
       for (const file of fs.readdirSync(dir)) {
         if (!file.endsWith('.ts')) continue;
+        if (file.startsWith("_TEMPLATE")) continue;
         const filePath = path.join(dir, file);
         const content = fs.readFileSync(filePath, 'utf-8');
         const relativePath = path.relative(this.projectRoot, filePath);
@@ -355,6 +357,10 @@ export class TypeScriptScanner {
     }
 
     return units;
+  }
+
+  private sanitizeId(text: string): string {
+    return text.replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_").toLowerCase();
   }
 
   private buildAssociations(units: MemoryUnit[]): void {
