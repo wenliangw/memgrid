@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.4.0');
+  .version('0.5.0');
 
 program
   .command('init')
@@ -35,6 +35,37 @@ program
     }
     console.log(`\nTotal: ${stats.totalUnits} units`);
     console.log(`Storage: .claude/memory-grid/`);
+  });
+
+program
+  .command('sync')
+  .description('Incremental sync — re-scan only changed files (fast, for CI/CD or post-git-pull)')
+  .option('--no-rules', 'Skip scanning .claude/rules/')
+  .option('--no-examples', 'Skip scanning .claude/examples/')
+  .option('-t, --threshold <number>', 'Fuzzy match threshold (0.0-1.0)', '0.45')
+  .action(async (options) => {
+    const mg = new MemGrid(process.cwd());
+    console.log('🔄 Syncing (incremental)...\n');
+
+    const result = await mg.sync({
+      projectRoot: process.cwd(),
+      includeRules: options.rules !== false,
+      includeExamples: options.examples !== false,
+      fuzzyThreshold: parseFloat(options.threshold),
+    });
+
+    if (result.changedFiles.length === 0 && result.removedFiles.length === 0) {
+      console.log('✅ No changes detected — grid is up to date');
+      return;
+    }
+
+    console.log(`📁 Changed files:  ${result.changedFiles.length}`);
+    console.log(`🗑️  Removed files:  ${result.removedFiles.length}`);
+    console.log(`📝 Updated units:  ${result.updatedUnits}`);
+    console.log(`⚠️  Stale units:    ${result.staleUnits}`);
+    console.log(`🔗 Repaired links: ${result.repairedAssociations}`);
+    console.log(`💔 Broken links:   ${result.brokenAssociations}`);
+    console.log(`\n⏱️  Done in ${result.elapsedMs}ms`);
   });
 
 program

@@ -60,6 +60,9 @@ export interface MemoryUnit {
   };
 }
 
+/** SHA-256 hash of each scanned source file, keyed by relative path */
+export type FileSnapshot = Record<string, string>;
+
 export interface MemoryGrid {
   version: string;
   project: string;
@@ -71,6 +74,34 @@ export interface MemoryGrid {
     totalAssociations: number;
   };
   edgeIndex: Record<string, Association[]>;
+  fileSnapshot?: FileSnapshot;
+}
+
+/** Result of a sync operation */
+export interface SyncResult {
+  /** Files that changed (has hash delta) */
+  changedFiles: string[];
+  /** Files that were removed entirely */
+  removedFiles: string[];
+  /** Units added or updated */
+  updatedUnits: number;
+  /** Units marked stale (method name/line changed beyond fuzzy match) */
+  staleUnits: number;
+  /** Associations repaired via fuzzy match */
+  repairedAssociations: number;
+  /** Broken associations that couldn't be repaired */
+  brokenAssociations: number;
+  /** Total time in ms */
+  elapsedMs: number;
+}
+
+/** Options for sync */
+export interface SyncOptions {
+  projectRoot: string;
+  includeRules: boolean;
+  includeExamples: boolean;
+  /** Max fuzzy match distance (0.0 = exact, 1.0 = anything) */
+  fuzzyThreshold?: number;
 }
 
 export interface SearchResult {
@@ -91,4 +122,11 @@ export interface SearchOptions {
   maxResults?: number;
   maxHops?: number;
   semanticWeight?: number;
+}
+
+/** Single-file scan result from SyncEngine */
+export interface FileScanResult {
+  file: string;
+  units: MemoryUnit[];
+  hash: string;
 }
