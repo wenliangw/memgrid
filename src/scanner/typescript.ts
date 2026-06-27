@@ -193,8 +193,11 @@ export class TypeScriptScanner {
 
         if (!title || body.length < 50) continue;
 
+        const safeTitle = title.replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 50).toLowerCase();
+        const safeFile = file.replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
+
         const unit: MemoryUnit = {
-          id: `rule_${file.replace('.md', '')}_${title.toLowerCase().replace(/\s+/g, '_').slice(0, 40)}`,
+          id: `rule_${safeFile}_${safeTitle}`,
           type: 'pattern',
           summary: `${file.replace('.md', '')}: ${title}`,
           source: { file: relativePath },
@@ -216,8 +219,9 @@ export class TypeScriptScanner {
       }
 
       // Also create a rule_trigger unit
+      const safeFile = file.replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
       const triggerUnit: MemoryUnit = {
-        id: `trigger_rule_${file.replace('.md', '')}`,
+        id: `trigger_rule_${safeFile}`,
         type: 'rule_trigger',
         summary: `When working on ${file.replace('.md', '').replace(/-/g, ' ')} → load ${file}`,
         source: { file: relativePath },

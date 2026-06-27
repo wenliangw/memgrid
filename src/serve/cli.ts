@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { MemGrid } from '../memgrid.js';
+import { startMCPServer } from './mcp-server.js';
 
 const program = new Command();
 
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.1.0');
+  .version('0.2.0');
 
 program
   .command('init')
@@ -95,11 +96,10 @@ program
 
 program
   .command('serve')
-  .description('Start MCP Server (coming soon)')
-  .option('-p, --port <port>', 'Port to listen on', '3456')
-  .action(async (options) => {
-    console.log('⏳ MCP Server coming in Phase 2...');
-    console.log(`Would start on port ${options.port}`);
+  .description('Start MCP Server (stdio transport)')
+  .action(async () => {
+    console.error('🚀 MemGrid MCP Server starting...');
+    await startMCPServer(process.cwd());
   });
 
 program.parse();
