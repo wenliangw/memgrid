@@ -1,0 +1,59 @@
+{
+  "name": "memgrid",
+  "version": "0.1.0",
+  "description": "Project-level semantic memory system for AI coding agents. Replaces full-codebase context loading with a self-evolving knowledge-mesh.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "memgrid": "dist/serve/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cli": "node dist/serve/cli.js"
+  },
+  "keywords": [
+    "ai",
+    "memory",
+    "claude-code",
+    "agent",
+    "coding-agent",
+    "knowledge-graph",
+    "semantic-memory",
+    "rag",
+    "context"
+  ],
+  "author": "wenliangw",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wenliangw/memgrid"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1",
+    "commander": "^13",
+    "js-yaml": "^5",
+    "minisearch": "^7",
+    "ts-morph": "^28"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4",
+    "@types/node": "^26",
+    "typescript": "^6",
+    "vitest": "^4"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.5.0",
+      "onFail": "download"
+    }
+  }
+}
