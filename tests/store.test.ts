@@ -66,7 +66,7 @@ describe('FileStore', () => {
     expect(units[0].id).toBe('active_1');
   });
 
-  it('archives a unit', () => {
+  it('archives a unit', async () => {
     store.ensureDirs();
     store.saveUnit({
       id: 'to_archive',
@@ -79,7 +79,11 @@ describe('FileStore', () => {
     });
 
     store.archiveUnit('to_archive');
-    expect(store.getUnit('to_archive')).toBeNull(); // removed from active
+    expect(store.getUnit('to_archive')).not.toBeNull(); // still available in archive
+    
+    // But not in active list
+    const activeUnits = await store.listUnits();
+    expect(activeUnits.find(u => u.id === 'to_archive')).toBeUndefined();
   });
 
   it('saves and retrieves grid metadata', () => {

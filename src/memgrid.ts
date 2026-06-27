@@ -23,6 +23,8 @@ export class MemGrid {
   }
 
   async init(options: ScanOptions): Promise<MemoryUnit[]> {
+    // Load existing cache first (if any)
+    this.store.load();
     const units = await this.scanner.scan(options);
     // Build semantic index after scan
     await this.semantic.buildIndex();
@@ -30,7 +32,12 @@ export class MemGrid {
   }
 
   async search(query: string, options?: SearchOptions): Promise<SearchResult> {
-    return await this.semantic.search(query, options);
+    const result = await this.semantic.search(query, options);
+    // Touch usage counts for retrieved units (in-memory, periodically flushed)
+    for (const unit of result.units) {
+      this.store.touch(unit.id);
+    }
+    return result;
   }
 
   async add(unit: Partial<MemoryUnit> & { id: string; type: MemoryUnit['type']; summary: string; content: MemoryUnit['content'] }): Promise<MemoryUnit> {
@@ -84,19 +91,11 @@ export class MemGrid {
   }
 
   async stats() {
-    const units = await this.store.listUnits();
+    const cached = this.store.getStats();
     const grid = this.store.getGrid();
 
-    const typeDistribution: Record<string, number> = {};
-    for (const u of units) {
-      typeDistribution[u.type] = (typeDistribution[u.type] || 0) + 1;
-    }
-
     return {
-      totalUnits: units.length,
-      activeUnits: units.filter((u) => u.meta.status === 'active').length,
-      archivedUnits: units.filter((u) => u.meta.status === 'archived').length,
-      typeDistribution,
+      ...cached,
       lastScanAt: grid?.lastScanAt || null,
       version: grid?.version || '0.1.0',
     };
