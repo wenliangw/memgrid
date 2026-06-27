@@ -21,7 +21,7 @@ export class MemGridServer {
   constructor(projectRoot: string) {
     this.mg = new MemGrid(projectRoot);
     this.server = new Server(
-      { name: 'memgrid', version: '0.2.0' },
+      { name: 'memgrid', version: '0.3.0' },
       { capabilities: { tools: {} } },
     );
 

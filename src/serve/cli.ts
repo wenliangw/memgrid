@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.2.0');
+  .version('0.3.0');
 
 program
   .command('init')

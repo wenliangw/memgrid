@@ -1,0 +1,284 @@
+import type { MemoryUnit, MemoryUnitType } from '../shared/types.js';
+import type { FileStore } from '../store/file-store.js';
+import { RetrieveEngine } from '../retrieve/index.js';
+
+export interface TaskResult {
+  summary: string;         // What was the task about?
+  outcome: string;         // What was the outcome?
+  filesModified: string[]; // Files that were modified/created
+  errorsEncountered?: string[];  // Any errors and how they were fixed
+  decisions?: string[];    // Any design decisions made
+  toolsUsed?: string[];    // MCP/skill/rules used
+  styleObservations?: string[]; // Style preferences observed
+}
+
+export interface LearningSuggestions {
+  add: Partial<MemoryUnit>[];
+  update: { id: string; patch: Partial<MemoryUnit> }[];
+  archive: string[];
+  summary: string;
+}
+
+export class LearnEngine {
+  private store: FileStore;
+  private retrieve: RetrieveEngine;
+
+  constructor(store: FileStore) {
+    this.store = store;
+    this.retrieve = new RetrieveEngine(store);
+  }
+
+  /**
+   * Analyze a completed task and suggest memory grid updates.
+   * This is the core "self-learning" loop — called after every task.
+   */
+  async analyze(task: TaskResult): Promise<LearningSuggestions> {
+    const suggestions: LearningSuggestions = {
+      add: [],
+      update: [],
+      archive: [],
+      summary: '',
+    };
+
+    const summaries: string[] = [];
+
+    // 1. Suggest new method units for modified files
+    if (task.filesModified.length > 0) {
+      const existingUnits = await this.store.listUnits();
+      const existingFiles = new Set(
+        existingUnits
+          .filter((u) => u.source?.file)
+          .map((u) => u.source!.file),
+      );
+
+      const newFiles = task.filesModified.filter((f) => !existingFiles.has(f));
+
+      if (newFiles.length > 0) {
+        summaries.push(`🆕 ${newFiles.length} new files to scan`);
+        // Don't actually scan here — just flag for memgrid init
+        for (const file of newFiles) {
+          suggestions.add.push({
+            type: 'method',
+            summary: `[TODO] New file: ${file}`,
+            content: {
+              description: `This file was created/modified in task: "${task.summary}". Run \`memgrid init\` to scan for method units.`,
+              trigger: `When working near ${file}`,
+              action: `Rescan with memgrid init`,
+            },
+            source: { file },
+          });
+        }
+      }
+    }
+
+    // 2. Suggest error_solution units
+    if (task.errorsEncountered && task.errorsEncountered.length > 0) {
+      for (const error of task.errorsEncountered) {
+        const id = `error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        suggestions.add.push({
+          type: 'error_solution',
+          summary: `Error fix: ${error.slice(0, 80)}`,
+          content: {
+            description: error,
+          },
+        });
+      }
+      summaries.push(`🐛 ${task.errorsEncountered.length} error(s) recorded as error_solution units`);
+    }
+
+    // 3. Suggest decision units
+    if (task.decisions && task.decisions.length > 0) {
+      for (const decision of task.decisions) {
+        const id = `decision_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        suggestions.add.push({
+          type: 'decision',
+          summary: decision.slice(0, 80),
+          content: {
+            description: `Design decision from task "${task.summary}": ${decision}`,
+          },
+        });
+      }
+      summaries.push(`🎯 ${task.decisions.length} decision(s) recorded`);
+    }
+
+    // 4. Suggest trigger units based on tools used
+    if (task.toolsUsed && task.toolsUsed.length > 0) {
+      for (const tool of task.toolsUsed) {
+        // Check if a similar trigger already exists
+        const existing = (await this.store.listUnits()).find(
+          (u) => u.type === 'skill_trigger' && u.summary.includes(tool),
+        );
+
+        if (!existing) {
+          const id = `trigger_skill_${tool.replace(/[^a-z0-9_]/g, '_')}_${Date.now()}`;
+          suggestions.add.push({
+            type: 'skill_trigger',
+            summary: `When working on ${this.inferDomain(task.summary)} → use ${tool}`,
+            content: {
+              description: `Task "${task.summary}" successfully used ${tool}`,
+              trigger: this.inferDomain(task.summary),
+              action: `Enable and use ${tool}`,
+            },
+          });
+        }
+      }
+      summaries.push(`🔧 ${task.toolsUsed.length} tool trigger(s) suggested`);
+    }
+
+    // 5. Suggest style_preference units based on observations
+    if (task.styleObservations && task.styleObservations.length > 0) {
+      for (const style of task.styleObservations) {
+        const id = `style_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        suggestions.add.push({
+          type: 'style_preference',
+          summary: style.slice(0, 80),
+          content: {
+            description: `Observed in task "${task.summary}": ${style}`,
+            style_notes: style,
+          },
+        });
+      }
+      summaries.push(`🎨 ${task.styleObservations.length} style preference(s) recorded`);
+    }
+
+    // 6. Check for units that might need archiving (stale — referenced files deleted)
+    const allUnits = await this.store.listUnits();
+    for (const unit of allUnits.filter((u) => u.type === 'method')) {
+      if (unit.source?.file && task.filesModified.includes(unit.source.file)) {
+        // File was modified — flag for review
+        suggestions.update.push({
+          id: unit.id,
+          patch: {
+            meta: {
+              ...unit.meta,
+              status: 'stale',
+              updated: new Date().toISOString(),
+            },
+          },
+        });
+      }
+    }
+
+    // 7. Build summary
+    if (summaries.length === 0) {
+      suggestions.summary = 'No significant new knowledge to add. Grid is stable for this task.';
+    } else {
+      suggestions.summary = summaries.join('\n');
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Apply the learning suggestions to the grid.
+   * Only applies units with confidence >= 0.7 by default.
+   */
+  async apply(suggestions: LearningSuggestions, minConfidence = 0.7): Promise<string[]> {
+    const applied: string[] = [];
+
+    for (const unit of suggestions.add) {
+      const fullUnit: MemoryUnit = {
+        id: `auto_${unit.type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: unit.type as MemoryUnitType,
+        summary: unit.summary || 'Unknown',
+        signatures: unit.signatures || [],
+        content: unit.content || { description: '' },
+        source: unit.source,
+        associations: [],
+        meta: {
+          created: new Date().toISOString(),
+          updated: new Date().toISOString(),
+          confidence: 0.6, // Auto-generated, lower confidence
+          usage_count: 0,
+          status: 'active',
+        },
+      };
+
+      if (fullUnit.meta.confidence >= minConfidence) {
+        this.store.saveUnit(fullUnit);
+        applied.push(`+ ${fullUnit.id}`);
+      } else {
+        // Save anyway but mark as needs-review
+        fullUnit.meta.status = 'stale'; // stale here means "pending human review"
+        this.store.saveUnit(fullUnit);
+        applied.push(`? ${fullUnit.id} (needs review, confidence: ${fullUnit.meta.confidence})`);
+      }
+    }
+
+    for (const { id, patch } of suggestions.update) {
+      const existing = this.store.getUnit(id);
+      if (existing) {
+        Object.assign(existing, patch);
+        existing.meta.updated = new Date().toISOString();
+        this.store.saveUnit(existing);
+        applied.push(`~ ${id} (updated)`);
+      }
+    }
+
+    for (const id of suggestions.archive) {
+      this.store.archiveUnit(id);
+      applied.push(`- ${id} (archived)`);
+    }
+
+    return applied;
+  }
+
+  /**
+   * Generate a plain text summary of suggestions for display/copy.
+   */
+  formatSuggestions(suggestions: LearningSuggestions): string {
+    const lines: string[] = ['## 📋 Learning Suggestions', '', suggestions.summary, ''];
+
+    if (suggestions.add.length > 0) {
+      lines.push(`### Add (${suggestions.add.length})`, '');
+      for (const unit of suggestions.add) {
+        lines.push(`- [${unit.type}] ${unit.summary}`);
+      }
+      lines.push('');
+    }
+
+    if (suggestions.update.length > 0) {
+      lines.push(`### Update (${suggestions.update.length})`, '');
+      for (const { id, patch } of suggestions.update) {
+        const status = (patch.meta as any)?.status || 'changed';
+        lines.push(`- \`${id}\` → ${status}`);
+      }
+      lines.push('');
+    }
+
+    if (suggestions.archive.length > 0) {
+      lines.push(`### Archive (${suggestions.archive.length})`, '');
+      for (const id of suggestions.archive) {
+        lines.push(`- \`${id}\``);
+      }
+      lines.push('');
+    }
+
+    lines.push('---', 'Run `memgrid apply-suggestions` to apply all changes.');
+    return lines.join('\n');
+  }
+
+  /**
+   * Infer the domain/subject area from a task summary.
+   */
+  private inferDomain(summary: string): string {
+    const domains: Record<string, string[]> = {
+      'server code': ['server', 'api', 'controller', 'service', 'nest', 'typeorm', 'postgres', 'database', 'auth'],
+      'frontend': ['web', 'ui', 'component', 'page', 'chakra', 'react', 'next', 'figma', 'style', 'css'],
+      'config': ['config', 'env', 'docker', 'ci', 'deploy', 'package'],
+      'review': ['pr', 'review', 'merge', 'branch'],
+      'docs': ['docs', 'readme', 'documentation'],
+      'memory': ['memory', 'grid', 'atom'],
+    };
+
+    const lower = summary.toLowerCase();
+
+    for (const [domain, keywords] of Object.entries(domains)) {
+      if (keywords.some((k) => lower.includes(k))) {
+        return domain;
+      }
+    }
+
+    return 'generic development tasks';
+  }
+}

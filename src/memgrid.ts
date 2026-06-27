@@ -2,11 +2,13 @@ import type { MemoryUnit, ScanOptions, SearchOptions, SearchResult } from './sha
 import { FileStore } from './store/file-store.js';
 import { TypeScriptScanner } from './scanner/typescript.js';
 import { RetrieveEngine } from './retrieve/index.js';
+import { LearnEngine, type TaskResult, type LearningSuggestions } from './learn/index.js';
 
 export class MemGrid {
   store: FileStore;
   scanner: TypeScriptScanner;
   retrieve: RetrieveEngine;
+  learn: LearnEngine;
   projectRoot: string;
 
   constructor(projectRoot: string) {
@@ -14,6 +16,7 @@ export class MemGrid {
     this.store = new FileStore(projectRoot);
     this.scanner = new TypeScriptScanner(this.store, projectRoot);
     this.retrieve = new RetrieveEngine(this.store);
+    this.learn = new LearnEngine(this.store);
   }
 
   async init(options: ScanOptions): Promise<MemoryUnit[]> {
@@ -60,6 +63,18 @@ export class MemGrid {
 
   context(result: SearchResult): string {
     return this.retrieve.toContext(result);
+  }
+
+  async analyzeTask(task: TaskResult): Promise<LearningSuggestions> {
+    return await this.learn.analyze(task);
+  }
+
+  async applySuggestions(suggestions: LearningSuggestions): Promise<string[]> {
+    return await this.learn.apply(suggestions);
+  }
+
+  formatSuggestions(suggestions: LearningSuggestions): string {
+    return this.learn.formatSuggestions(suggestions);
   }
 
   async stats() {
