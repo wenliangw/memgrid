@@ -9,6 +9,18 @@ import { RetrieveEngine } from './index.js';
 import type { FileStore } from '../store/file-store.js';
 import type { MemoryUnit, SearchResult } from '../shared/types.js';
 
+/** Simple LRU cache */
+class LRUCache<K, V> {
+  private map = new Map<K, V>();
+  constructor(private max: number = 100) {}
+  get(key: K): V | undefined { return this.map.get(key); }
+  set(key: K, value: V): void {
+    if (this.map.size >= this.max) this.map.delete(this.map.keys().next().value as K);
+    this.map.set(key, value);
+  }
+  clear(): void { this.map.clear(); }
+}
+
 export interface EmbeddingProvider {
   name: string;
   embed(texts: string[]): Promise<number[][]>;
@@ -27,6 +39,7 @@ export class SemanticRetriever {
   private store: FileStore;
   private provider: EmbeddingProvider | null = null;
   private vectorCache: Map<string, number[]> = new Map();
+  private resultCache: LRUCache<string, SearchResult> = new LRUCache(100);
 
   constructor(store: FileStore, provider?: EmbeddingProvider) {
     this.store = store;
@@ -81,7 +94,12 @@ export class SemanticRetriever {
   async search(query: string, options?: SemanticSearchOptions): Promise<SearchResult> {
     const maxResults = options?.maxResults ?? 10;
     const maxHops = options?.maxHops ?? 2;
-    const semanticWeight = options?.semanticWeight ?? 0.4; // prefer keyword slightly
+    const semanticWeight = options?.semanticWeight ?? 0.4;
+
+    // Check result cache
+    const cacheKey = `${query}::${maxResults}::${maxHops}::${semanticWeight}`;
+    const cached = this.resultCache.get(cacheKey);
+    if (cached) return { ...cached, elapsedMs: 0 };
 
     // Step 1: Keyword search (always works)
     const keywordResult = await this.baseEngine.search(query, maxResults * 2, maxHops);
@@ -144,12 +162,17 @@ export class SemanticRetriever {
       .map(([id]) => allKeywordUnits.get(id))
       .filter(Boolean) as MemoryUnit[];
 
-    return {
+    const result: SearchResult = {
       query,
       units: resultUnits,
       totalHops: maxHops,
       elapsedMs: 0,
     };
+
+    // Cache result
+    this.resultCache.set(cacheKey, result);
+
+    return result;
   }
 
   toContext(result: SearchResult): string {

@@ -18,21 +18,17 @@ export class TypeScriptScanner {
 
     this.store.ensureDirs();
 
-    // 1. Scan TypeScript source files
-    units.push(...await this.scanTypeScript());
+    // Run all scans in parallel (they are independent)
+    const scans: Promise<MemoryUnit[]>[] = [this.scanTypeScript()];
 
-    // 2. Scan .claude/rules/ for patterns
-    if (options.includeRules) {
-      units.push(...await this.scanRules());
+    if (options.includeRules) scans.push(this.scanRules());
+    if (options.includeExamples) scans.push(this.scanExamples());
+    scans.push(this.scanConfig());
+
+    const results = await Promise.all(scans);
+    for (const result of results) {
+      units.push(...result);
     }
-
-    // 3. Scan .claude/examples/ for patterns
-    if (options.includeExamples) {
-      units.push(...await this.scanExamples());
-    }
-
-    // 4. Scan config files
-    units.push(...await this.scanConfig());
 
     // 5. Build associations
     this.buildAssociations(units);
@@ -44,6 +40,9 @@ export class TypeScriptScanner {
 
     // 7. Update mesh.json
     this.updateGrid(units);
+
+    // Invalidate search index (units changed)
+    // (handled by store.load() called before this)
 
     return units;
   }
