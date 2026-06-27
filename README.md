@@ -138,7 +138,7 @@ Savings: 97.5%
 
 Memory units are stored as YAML files in `.claude/memory-grid/units/` — **Git-friendly and human-readable**.
 
-```yaml
+``.json
 id: method_creation_create
 type: method
 summary: "CreationDomainService.create — Create a new work"

@@ -39,13 +39,10 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1",
     "commander": "^13",
-    "js-yaml": "^5",
-    "mathjs": "^15.2.0",
     "minisearch": "^7",
     "ts-morph": "^28"
   },
   "devDependencies": {
-    "@types/js-yaml": "^4",
     "@types/node": "^26",
     "typescript": "^6",
     "vitest": "^4"

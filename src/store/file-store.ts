@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 import type { MemoryUnit, MemoryGrid, MemoryUnitType } from '../shared/types.js';
 
 const GRID_DIR = '.claude/memory-grid';
@@ -16,21 +15,19 @@ export interface ListFilter {
 /**
  * File-based store with in-memory index cache.
  *
- * First init/load: all YAML files read → parsed → cached in Map.
+ * Units stored as JSON (not YAML) for maximum read/write performance.
+ * First init/load: all JSON files read → JSON.parse → cached in Map.
  * After that: listUnits()/getUnit() are O(1) memory lookups.
  * saveUnit() writes to disk + updates cache instantly.
- * Periodic sync: usage_count and meta changes flushed back to disk.
  */
 export class FileStore {
   private projectRoot: string;
 
-  // In-memory cache — the performance heart
+  // In-memory cache
   private cache: Map<string, MemoryUnit> = new Map();
   private archiveCache: Map<string, MemoryUnit> = new Map();
   private gridCache: MemoryGrid | null = null;
   private loaded = false;
-
-  // Dirty tracking: IDs of units whose usage_count has changed since last sync
   private dirtyUsage: Set<string> = new Set();
 
   constructor(projectRoot: string) {
@@ -45,14 +42,14 @@ export class FileStore {
   get meshPath(): string { return path.join(this.gridDir, MESH_FILE); }
 
   unitPath(id: string): string {
-    return path.join(this.unitsDir, `${id}.yaml`);
+    return path.join(this.unitsDir, `${id}.json`);
   }
 
   archivePath(id: string): string {
     const year = new Date().getFullYear();
     const dir = path.join(this.archiveDir, String(year));
     fs.mkdirSync(dir, { recursive: true });
-    return path.join(dir, `${id}.yaml`);
+    return path.join(dir, `${id}.json`);
   }
 
   // ===== Initialization =====
@@ -63,45 +60,48 @@ export class FileStore {
   }
 
   /**
-   * Load all YAML files into memory cache.
-   * Called once at startup. After this, listUnits/getUnit are O(1).
+   * Load all JSON unit files into memory cache.
+   * Supports both .json (new) and .yaml (legacy) for migration.
    */
   load(): { total: number; loadedMs: number } {
     const start = Date.now();
     this.ensureDirs();
 
+    const parseUnit = (filePath: string): MemoryUnit | null => {
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        return JSON.parse(content) as MemoryUnit;
+      } catch {
+        return null;
+      }
+    };
+
     // Load active units
     this.cache.clear();
     if (fs.existsSync(this.unitsDir)) {
       for (const file of fs.readdirSync(this.unitsDir)) {
-        if (!file.endsWith('.yaml')) continue;
-        try {
-          const content = fs.readFileSync(path.join(this.unitsDir, file), 'utf-8');
-          const unit = yaml.load(content) as MemoryUnit;
-          this.cache.set(unit.id, unit);
-        } catch {
-          // Skip corrupted files
-        }
+        if (!file.endsWith('.json') && !file.endsWith('.yaml')) continue;
+        const unit = parseUnit(path.join(this.unitsDir, file));
+        if (unit) this.cache.set(unit.id, unit);
       }
     }
 
     // Load archived units
     this.archiveCache.clear();
     if (fs.existsSync(this.archiveDir)) {
-      for (const yearDir of fs.readdirSync(this.archiveDir)) {
-        const archiveYearDir = path.join(this.archiveDir, yearDir);
-        if (!fs.statSync(archiveYearDir).isDirectory()) continue;
-        for (const file of fs.readdirSync(archiveYearDir)) {
-          if (!file.endsWith('.yaml')) continue;
-          try {
-            const content = fs.readFileSync(path.join(archiveYearDir, file), 'utf-8');
-            const unit = yaml.load(content) as MemoryUnit;
-            this.archiveCache.set(unit.id, unit);
-          } catch {
-            // Skip corrupted files
+      const walkArchive = (dir: string) => {
+        if (!fs.existsSync(dir)) return;
+        for (const entry of fs.readdirSync(dir)) {
+          const full = path.join(dir, entry);
+          if (fs.statSync(full).isDirectory()) {
+            walkArchive(full);
+          } else if (entry.endsWith('.json') || entry.endsWith('.yaml')) {
+            const unit = parseUnit(full);
+            if (unit) this.archiveCache.set(unit.id, unit);
           }
         }
-      }
+      };
+      walkArchive(this.archiveDir);
     }
 
     this.loaded = true;
@@ -113,31 +113,21 @@ export class FileStore {
     };
   }
 
-  /** Reload from disk (e.g., after external edit) */
-  reload(): void {
-    this.load();
-  }
+  reload(): void { this.load(); }
 
   // ===== Unit read (from cache) =====
 
   async listUnits(filter?: ListFilter): Promise<MemoryUnit[]> {
     this.ensureLoaded();
-
     const results: MemoryUnit[] = [];
 
-    // Active units from cache
     for (const unit of this.cache.values()) {
-      if (!filter?.type || unit.type === filter.type) {
-        results.push(unit);
-      }
+      if (!filter?.type || unit.type === filter.type) results.push(unit);
     }
 
-    // Archived units
     if (filter?.includeArchived) {
       for (const unit of this.archiveCache.values()) {
-        if (!filter?.type || unit.type === filter.type) {
-          results.push(unit);
-        }
+        if (!filter?.type || unit.type === filter.type) results.push(unit);
       }
     }
 
@@ -149,13 +139,13 @@ export class FileStore {
     return this.cache.get(id) || this.archiveCache.get(id) || null;
   }
 
-  // ===== Unit write (to disk + cache) =====
+  // ===== Unit write (JSON → disk + cache) =====
 
   saveUnit(unit: MemoryUnit): void {
     this.ensureLoaded();
     const filePath = this.unitPath(unit.id);
-    const yamlStr = yaml.dump(unit, { lineWidth: 120, noRefs: true });
-    fs.writeFileSync(filePath, yamlStr, 'utf-8');
+    const jsonStr = JSON.stringify(unit, null, 2);
+    fs.writeFileSync(filePath, jsonStr, 'utf-8');
 
     // Update cache
     if (unit.meta.status === 'archived') {
@@ -169,9 +159,7 @@ export class FileStore {
   deleteUnit(id: string): void {
     this.ensureLoaded();
     const filePath = this.unitPath(id);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     this.cache.delete(id);
     this.archiveCache.delete(id);
   }
@@ -187,19 +175,14 @@ export class FileStore {
     unit.meta.status = 'archived';
     unit.meta.updated = new Date().toISOString();
 
-    const yamlStr = yaml.dump(unit, { lineWidth: 120, noRefs: true });
-    fs.writeFileSync(toPath, yamlStr, 'utf-8');
-
+    const jsonStr = JSON.stringify(unit, null, 2);
+    fs.writeFileSync(toPath, jsonStr, 'utf-8');
     if (fs.existsSync(fromPath)) fs.unlinkSync(fromPath);
 
-    // Update cache
     this.cache.delete(id);
     this.archiveCache.set(id, unit);
   }
 
-  /**
-   * Increment usage count (in-memory only, flushed on sync)
-   */
   touch(id: string): void {
     this.ensureLoaded();
     const unit = this.cache.get(id) || this.archiveCache.get(id);
@@ -209,10 +192,6 @@ export class FileStore {
     }
   }
 
-  /**
-   * Flush dirty usage counts back to disk.
-   * Call periodically or on shutdown.
-   */
   flushUsage(): { synced: number } {
     let synced = 0;
     for (const id of this.dirtyUsage) {
@@ -222,8 +201,7 @@ export class FileStore {
           ? this.archivePath(id)
           : this.unitPath(id);
         if (fs.existsSync(filePath)) {
-          const yamlStr = yaml.dump(unit, { lineWidth: 120, noRefs: true });
-          fs.writeFileSync(filePath, yamlStr, 'utf-8');
+          fs.writeFileSync(filePath, JSON.stringify(unit, null, 2), 'utf-8');
           synced++;
         }
       }
@@ -232,15 +210,9 @@ export class FileStore {
     return { synced };
   }
 
-  // ===== Batch operations (fast, single-pass) =====
-
-  /**
-   * Save many units at once. Only writes changed ones to disk.
-   */
   saveUnits(units: MemoryUnit[]): { written: number; skipped: number } {
     this.ensureLoaded();
-    let written = 0;
-    let skipped = 0;
+    let written = 0, skipped = 0;
 
     for (const unit of units) {
       const existing = this.cache.get(unit.id);
@@ -255,13 +227,12 @@ export class FileStore {
     return { written, skipped };
   }
 
-  // ===== Grid (mesh.json) =====
+  // ===== Grid =====
 
   getGrid(): MemoryGrid | null {
     if (this.gridCache) return this.gridCache;
     if (!fs.existsSync(this.meshPath)) return null;
-    const content = fs.readFileSync(this.meshPath, 'utf-8');
-    this.gridCache = JSON.parse(content) as MemoryGrid;
+    this.gridCache = JSON.parse(fs.readFileSync(this.meshPath, 'utf-8')) as MemoryGrid;
     return this.gridCache;
   }
 
@@ -270,7 +241,7 @@ export class FileStore {
     fs.writeFileSync(this.meshPath, JSON.stringify(grid, null, 2), 'utf-8');
   }
 
-  // ===== Stats (from cache, no disk I/O) =====
+  // ===== Stats =====
 
   getStats() {
     this.ensureLoaded();
@@ -290,18 +261,10 @@ export class FileStore {
     };
   }
 
-  // ===== Cache management =====
-
   private ensureLoaded(): void {
-    if (!this.loaded) {
-      this.load();
-    }
+    if (!this.loaded) this.load();
   }
 
-  /**
-   * Quick equality check for units (compare key fields only).
-   * Avoids writing to disk if nothing changed.
-   */
   private unitsEqual(a: MemoryUnit, b: MemoryUnit): boolean {
     return (
       a.summary === b.summary &&
