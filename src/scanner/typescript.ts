@@ -63,8 +63,9 @@ export class TypeScriptScanner {
       skipAddingFilesFromTsConfig: false,
     });
 
-    // Add source files if no tsconfig
-    if (!fs.existsSync(tsConfigPath)) {
+    // Always add source directories that may not be in tsconfig
+    // (e.g., apps/server in monorepos where tsconfig only covers apps/web)
+    if (fs.existsSync(tsConfigPath)) {
       const srcDirs = this.findSourceDirs();
       for (const dir of srcDirs) {
         project.addSourceFilesAtPaths(`${dir}/**/*.ts`);
@@ -111,7 +112,7 @@ export class TypeScriptScanner {
               inputs: params.length > 0 ? params.join(', ') : 'none',
               outputs: returnType,
               dependencies: this.extractDependencies(method),
-              code_snippet: method.getText().split('\n').slice(0, 15).join('\n'), // first 15 lines
+              code_snippet: method.getText(), // Full text for association analysis
             },
             associations: [],
             meta: {
@@ -358,23 +359,99 @@ export class TypeScriptScanner {
 
   private buildAssociations(units: MemoryUnit[]): void {
     const methodUnits = units.filter((u) => u.type === 'method');
+    const patternUnits = units.filter((u) => u.type === 'pattern');
+    const configUnits = units.filter((u) => u.type === 'config');
+
+    // Build a signature → unit index for fast lookup
+    const sigIndex = new Map<string, string>(); // signature → unit id
+    for (const u of methodUnits) {
+      for (const sig of u.signatures) {
+        sigIndex.set(sig.toLowerCase(), u.id);
+      }
+    }
 
     for (const unit of methodUnits) {
-      const deps = unit.content.dependencies || [];
-      for (const dep of deps) {
-        // Find matching method unit
-        const matched = methodUnits.find((m) =>
-          m.signatures.some((s) => dep.includes(s.split('.')[s.split('.').length - 1])),
-        );
+      if (!unit.source?.file) continue;
 
-        if (matched && matched.id !== unit.id) {
+      // 1. Extract called names from code_snippet
+      const snippet = unit.content.code_snippet || '';
+      const calledNames = this.extractCalledNames(snippet);
+
+      for (const name of calledNames) {
+        // Exact match in sigIndex
+        let matchedId = sigIndex.get(name.toLowerCase());
+
+        // Partial match: "this.verifyOwnership" → matches "verifyOwnership"
+        if (!matchedId) {
+          for (const [sig, id] of sigIndex) {
+            if (sig.includes(name.toLowerCase()) || name.toLowerCase().includes(sig)) {
+              matchedId = id;
+              break;
+            }
+          }
+        }
+
+        if (matchedId && matchedId !== unit.id) {
           unit.associations.push({
-            to: matched.id,
+            to: matchedId,
             relation: 'calls',
             weight: 0.8,
           });
         }
       }
+
+      // 2. Match patterns used in this method
+      for (const p of patternUnits) {
+        for (const sig of p.signatures) {
+          if (snippet.toLowerCase().includes(sig.toLowerCase()) && sig.length > 5) {
+            unit.associations.push({
+              to: p.id,
+              relation: 'follows_rule',
+              weight: 0.6,
+            });
+            break;
+          }
+        }
+      }
+
+      // 3. Module-level association: same source subdirectory
+      const unitDir = path.dirname(unit.source.file);
+      const siblings = methodUnits.filter(
+        (m) => m.source?.file && path.dirname(m.source.file) === unitDir && m.id !== unit.id,
+      );
+      for (const sib of siblings.slice(0, 3)) {
+        unit.associations.push({
+          to: sib.id,
+          relation: 'belongs_to_module',
+          weight: 0.3,
+        });
+      }
+    }
+
+    // 4. Config → method associations (methods using config values)
+    for (const config of configUnits) {
+      const configKeywords = config.signatures;
+      for (const method of methodUnits) {
+        const snippet = (method.content.code_snippet || '') + (method.content.description || '');
+        if (configKeywords.some((k) => snippet.toLowerCase().includes(k.toLowerCase()) && k.length > 3)) {
+          method.associations.push({
+            to: config.id,
+            relation: 'calls',
+            weight: 0.4,
+          });
+        }
+      }
+    }
+
+    // Deduplicate associations
+    for (const unit of methodUnits) {
+      const seen = new Set<string>();
+      unit.associations = unit.associations.filter((a) => {
+        const key = `${a.to}:${a.relation}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     }
   }
 
@@ -416,7 +493,6 @@ export class TypeScriptScanner {
   }
 
   private extractDependencies(method: any): string[] {
-    // Simple heuristic: find method calls in the body
     const body = method.getBodyText?.() || '';
     const deps: string[] = [];
 
@@ -428,6 +504,58 @@ export class TypeScriptScanner {
     }
 
     return deps;
+  }
+
+  /**
+   * Extract function/method names called in a code snippet.
+   * Matches patterns like: foo(), await foo(), this.foo(), obj.foo()
+   */
+  private extractCalledNames(code: string): string[] {
+    const names = new Set<string>();
+
+    // Match function calls: foo(...), await foo(...), this.foo(...), obj.foo(...)
+    const callPatterns = [
+      /\b(\w+)\s*\(/g,           // direct calls: foo()
+      /this\.(\w+)\s*\(/g,        // this.foo()
+      /(\w+)\.(\w+)\s*\(/g,      // obj.method() — captures both obj and method
+    ];
+
+    for (const pattern of callPatterns) {
+      let match;
+      while ((match = pattern.exec(code)) !== null) {
+        // Take the last capture group (the actual called function name)
+        const name = match[match.length - 1];
+        if (name && name.length > 2 && !this.isCommonKeyword(name)) {
+          names.add(name);
+        }
+      }
+    }
+
+    // Match import statements
+    const importPattern = /import\s*\{[^}]*\}\s*from\s*['"]([^'"]+)['"]/g;
+    let match;
+    while ((match = importPattern.exec(code)) !== null) {
+      // Extract individual imported names
+      const namesStr = match[0].match(/\{([^}]*)\}/)?.[1] || '';
+      for (const n of namesStr.split(',')) {
+        const clean = n.trim().split(/\s+as\s+/)[0].trim();
+        if (clean && clean.length > 2) names.add(clean);
+      }
+    }
+
+    return [...names];
+  }
+
+  private isCommonKeyword(name: string): boolean {
+    const keywords = new Set([
+      'if', 'for', 'let', 'var', 'new', 'try', 'const', 'typeof', 'instanceof',
+      'return', 'throw', 'await', 'async', 'while', 'switch', 'catch', 'finally',
+      'export', 'import', 'from', 'require', 'default', 'function', 'class',
+      'true', 'false', 'null', 'undefined', 'this', 'super', 'void', 'delete',
+      'map', 'filter', 'reduce', 'find', 'forEach', 'push', 'pop', 'slice',
+      'split', 'join', 'concat', 'sort', 'some', 'every', 'includes',
+    ]);
+    return keywords.has(name);
   }
 
   private findSourceDirs(): string[] {
