@@ -184,32 +184,34 @@ export class MemGridServer {
           }
 
           case 'memgrid_add': {
-            const {
-              type,
-              summary,
-              description,
-              sourceFile,
-              codeSnippet,
-              styleNotes,
-              associations,
-            } = args as any;
+            let { type, summary, description, sourceFile, codeSnippet, styleNotes, associations } =
+              args as any;
+
+            // NLP auto-detect: if no type provided, parse from description
+            if (!type && summary) {
+              const { parseMemoryInput } = await import('../learn/nlp.js');
+              const parsed = parseMemoryInput(summary + ' ' + (description || ''), sourceFile);
+              type = parsed.type;
+              summary = parsed.summary;
+              description = parsed.content.description || description;
+            }
 
             if (!VALID_TYPES.includes(type)) {
               return {
                 content: [
                   {
                     type: 'text',
-                    text: `Invalid type: "${type}". Must be one of: ${VALID_TYPES.join(', ')}`,
+                    text: 'Invalid type: "' + type + '". Must be one of: ' + VALID_TYPES.join(', '),
                   },
                 ],
                 isError: true,
               };
             }
 
-            const id = `${type}_${Date.now()}`;
+            const id = type + '_' + Date.now();
             const unit = await this.mg.add({
               id,
-              type: type as MemoryUnitType,
+              type: type,
               summary,
               content: {
                 description,
@@ -228,7 +230,15 @@ export class MemGridServer {
               content: [
                 {
                   type: 'text',
-                  text: `✅ Memory unit added: ${unit.id}\nType: ${unit.type}\nSummary: ${unit.summary}\nConfidence: ${unit.meta.confidence}`,
+                  text:
+                    '✅ Memory unit added: ' +
+                    unit.id +
+                    '\nType: ' +
+                    unit.type +
+                    '\nSummary: ' +
+                    unit.summary +
+                    '\nConfidence: ' +
+                    unit.meta.confidence,
                 },
               ],
             };
