@@ -184,8 +184,9 @@ export class MemGridServer {
           }
 
           case 'memgrid_add': {
-            let { type, summary, description, sourceFile, codeSnippet, styleNotes, associations } =
-              args as any;
+            let { summary, description } = args as any;
+            const { sourceFile, codeSnippet, styleNotes, associations } = args as any;
+            let { type } = args as any;
 
             // NLP auto-detect: if no type provided, parse from description
             if (!type && summary) {

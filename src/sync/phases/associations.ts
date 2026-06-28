@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { MemoryUnit, Association, SyncPattern } from '../../shared/types.js';
+import type { MemoryUnit } from '../../shared/types.js';
 
 /**
  * Phase 3: Rebuild associations for changed files.

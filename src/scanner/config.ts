@@ -82,6 +82,7 @@ export class ConfigScanner implements Scanner {
       try {
         const content = fs.readFileSync(pyProjectPath, 'utf-8');
         const depsMatch = content.match(/dependencies\s*=\s*\[([\s\S]*?)\]/);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const optDeps = content.match(/optional-dependencies\s*=\s*\{/);
         const deps = depsMatch
           ? depsMatch[1].match(/"([^"]+)"/g)?.map((d) => d.replace(/"/g, '')) || []

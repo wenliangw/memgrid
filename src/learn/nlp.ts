@@ -27,7 +27,7 @@ export interface ParsedMemory {
 /**
  * Parse a natural language description into a structured memory suggestion.
  */
-export function parseMemoryInput(input: string, sourceFile?: string): ParsedMemory {
+export function parseMemoryInput(input: string, _sourceFile?: string): ParsedMemory {
   const lower = input.toLowerCase().trim();
 
   // Detect error_solution: error/fix/bug/OOM/crash keywords
@@ -137,14 +137,14 @@ export function parseMemoryInput(input: string, sourceFile?: string): ParsedMemo
 /**
  * Create a MemoryUnit from parsed input.
  */
-export function createMemoryUnit(parsed: ParsedMemory, sourceFile?: string): MemoryUnit {
+export function createMemoryUnit(parsed: ParsedMemory, _sourceFile?: string): MemoryUnit {
   const id = `auto_${parsed.type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
   return {
     id,
     type: parsed.type,
     summary: parsed.summary,
-    source: sourceFile ? { file: sourceFile } : undefined,
+    source: _sourceFile ? { file: _sourceFile } : undefined,
     signatures: parsed.signatures,
     content: parsed.content,
     associations: [],
