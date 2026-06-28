@@ -192,19 +192,18 @@ export class RetrieveEngine {
   }
 
   /**
-   * Get units from store's in-memory cache (no disk I/O).
+   * Get units from store (in-memory after load, otherwise disk).
    */
   private getCachedUnits(): MemoryUnit[] {
-    // FileStore.load() already loaded everything into memory
-    // We access via listUnits() which reads from Map, not disk
-    const units: MemoryUnit[] = [];
-    const storeWithCache = this.store as any;
-    if (storeWithCache.cache && storeWithCache.cache.size > 0) {
-      for (const u of storeWithCache.cache.values()) {
-        units.push(u);
-      }
-    }
-    return units;
+    // FileStore.listUnits() reads from in-memory Map after load(),
+    // or loads from disk on first access. Safe to call sync — it's fast.
+    // Must use the public API, not internal cache field (private fields
+    // become #private in ES2022 target).
+    const list = this.store.listUnitsSync?.() || [];
+    if (list.length > 0) return list;
+    // Fallback: load on first call
+    const loaded = this.store.load();
+    return this.store.listUnitsSync?.() || [];
   }
 
   toContext(result: SearchResult): string {

@@ -127,6 +127,27 @@ export class FileStore {
 
   // ===== Unit read (from cache) =====
 
+  /**
+   * Synchronous version of listUnits — only reads from in-memory cache.
+   * Returns empty if cache not loaded yet. Call load() first.
+   */
+  listUnitsSync(filter?: ListFilter): MemoryUnit[] {
+    if (!this.loaded) return [];
+    const results: MemoryUnit[] = [];
+
+    for (const unit of this.cache.values()) {
+      if (!filter?.type || unit.type === filter.type) results.push(unit);
+    }
+
+    if (filter?.includeArchived) {
+      for (const unit of this.archiveCache.values()) {
+        if (!filter?.type || unit.type === filter.type) results.push(unit);
+      }
+    }
+
+    return results;
+  }
+
   async listUnits(filter?: ListFilter): Promise<MemoryUnit[]> {
     this.ensureLoaded();
     const results: MemoryUnit[] = [];
