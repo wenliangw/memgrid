@@ -2,10 +2,11 @@
 
 ## Branch Strategy
 
-- `main` — stable, releases are tagged from here
-- Feature branches: `feat/description` or `fix/description`
-- Direct commits to `main` should be small (docs, chores)
-- PR required for feature/fix branches
+- `main` — protected, no direct commits
+- All changes go through feature branches and PRs
+- Branch naming: `feat/description`, `fix/description`, `chore/description`, `docs/description`
+- Squash merge to `main` (clean history)
+- Delete feature branch after merge
 
 ## Commit Convention
 
