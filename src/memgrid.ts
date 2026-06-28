@@ -40,7 +40,13 @@ export class MemGrid {
     this.projectRoot = projectRoot;
     this.store = new FileStore(projectRoot);
     // Accept optional scanner injection, default to TypeScript
-    this.scanner = scanner ?? new TypeScriptScanner(this.store, projectRoot);
+    // Share a single RulesScanner between TypeScriptScanner and init() to avoid duplicates
+    if (!scanner) {
+      const rulesScanner = new RulesScanner(projectRoot);
+      this.scanner = new TypeScriptScanner(this.store, projectRoot, rulesScanner);
+    } else {
+      this.scanner = scanner;
+    }
     this.retrieve = new RetrieveEngine(this.store);
     this.semantic = new SemanticRetriever(this.store, provider || new KeywordEmbeddingProvider());
     this.learn = new LearnEngine(this.store);
@@ -56,7 +62,7 @@ export class MemGrid {
 
     // Run universal scanners (rules, config, markdown) in parallel
     const universalScans: Promise<MemoryUnit[]>[] = [];
-    if (options.includeRules) {
+    if (options.includeRules && !(this.scanner instanceof TypeScriptScanner)) {
       const rulesScanner = new RulesScanner(this.projectRoot);
       if (rulesScanner.detect(this.projectRoot)) universalScans.push(rulesScanner.scan(options));
     }
