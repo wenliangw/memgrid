@@ -2,7 +2,19 @@
 
 All notable changes to MemGrid.
 
-## v0.5.2 — Auto-Sync Hooks (unreleased)
+## v0.5.3 — Token Optimization (2026-06-28)
+
+### Changed
+- **RulesScanner**: remove pattern units, keep only rule_trigger (reduces redundancy)
+- **MarkdownScanner**: exclude README/CHANGELOG/CONTRIBUTING/LICENSE/CODE_OF_CONDUCT
+- **TypeScriptScanner**: skip migrations/, Controller methods don't store code_snippet
+- code_snippet truncated to 15 lines, description 500→200 characters
+- pattern unit weight in search ranking: ×1.0 → ×0.8
+
+### Perf
+- Token consumption reduced ~40% (67K → ~55K total, top-10 from 10K → ~6K)
+
+## v0.5.2 — Auto-Sync Hooks (2026-06-28)
 
 ### Added
 - `memgrid init` auto-configures memory sync hooks:
