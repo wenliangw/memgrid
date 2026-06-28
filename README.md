@@ -246,15 +246,6 @@ MemGrid outputs **standardized Markdown context** consumable by any AI coding to
 memgrid serve
 ```
 
-## 🗺️ Roadmap
-
-- [x] v0.1 — Core engine (scan, search, store, CLI)
-- [x] v0.2 — MCP Server + tests + Septonir integration
-- [x] v0.3 — Auto-learning engine (post-task grid evolution)
-- [x] v0.4 — Hybrid semantic search
-- [x] v0.5 — Incremental sync engine (hash diff + fuzzy repair)
-- [ ] v1.0 — Web dashboard + CI/CD integration
-
 ## License
 
 MIT
