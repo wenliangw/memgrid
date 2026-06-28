@@ -112,7 +112,7 @@ export class GoScanner implements Scanner {
         /^func\s+\((\w+)\s+\*?(\w+)\)\s+(\w+)\s*\(([^)]*)\)\s*(\(?[\w[\]*.]+\)?)?\s*\{/,
       );
       if (match) {
-        const receiverName = match[1];
+        const _receiverName = match[1];
         const receiverType = match[2];
         const methodName = match[3];
         const params = match[4];

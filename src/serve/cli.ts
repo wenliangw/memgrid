@@ -52,7 +52,7 @@ program
     const mg = new MemGrid(root);
     console.log(`🔍 Scanning project (${detected.join(', ') || 'typescript'})...\n`);
 
-    const units = await mg.init({
+    await mg.init({
       projectRoot: process.cwd(),
       includeRules: options.rules !== false,
       includeExamples: options.examples !== false,

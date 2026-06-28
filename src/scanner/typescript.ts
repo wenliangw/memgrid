@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Project, SyntaxKind } from 'ts-morph';
-import type { MemoryUnit, MemoryGrid, Association, ScanOptions } from '../shared/types.js';
+import type { MemoryUnit, MemoryGrid, ScanOptions } from '../shared/types.js';
 import type { FileStore } from '../store/file-store.js';
 import type { Scanner } from './scanner.js';
 import type { RulesScanner } from './rules.js';

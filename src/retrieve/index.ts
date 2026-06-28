@@ -203,7 +203,7 @@ export class RetrieveEngine {
     const list = this.store.listUnitsSync?.() || [];
     if (list.length > 0) return list;
     // Fallback: load on first call
-    const loaded = this.store.load();
+    this.store.load();
     return this.store.listUnitsSync?.() || [];
   }
 

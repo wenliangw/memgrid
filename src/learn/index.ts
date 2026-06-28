@@ -72,7 +72,7 @@ export class LearnEngine {
     // 2. Suggest error_solution units
     if (task.errorsEncountered && task.errorsEncountered.length > 0) {
       for (const error of task.errorsEncountered) {
-        const id = `error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const _id = `error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         suggestions.add.push({
           type: 'error_solution',
           summary: `Error fix: ${error.slice(0, 80)}`,
@@ -89,7 +89,7 @@ export class LearnEngine {
     // 3. Suggest decision units
     if (task.decisions && task.decisions.length > 0) {
       for (const decision of task.decisions) {
-        const id = `decision_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const _id = `decision_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         suggestions.add.push({
           type: 'decision',
           summary: decision.slice(0, 80),
@@ -110,7 +110,7 @@ export class LearnEngine {
         );
 
         if (!existing) {
-          const id = `trigger_skill_${tool.replace(/[^a-z0-9_]/g, '_')}_${Date.now()}`;
+          const _id = `trigger_skill_${tool.replace(/[^a-z0-9_]/g, '_')}_${Date.now()}`;
           suggestions.add.push({
             type: 'skill_trigger',
             summary: `When working on ${this.inferDomain(task.summary)} → use ${tool}`,
@@ -128,7 +128,7 @@ export class LearnEngine {
     // 5. Suggest style_preference units based on observations
     if (task.styleObservations && task.styleObservations.length > 0) {
       for (const style of task.styleObservations) {
-        const id = `style_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const _id = `style_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         suggestions.add.push({
           type: 'style_preference',
           summary: style.slice(0, 80),
