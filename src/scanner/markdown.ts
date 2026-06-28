@@ -56,7 +56,8 @@ export class MarkdownScanner implements Scanner {
             .toLowerCase();
           if (!safeTitle || safeTitle === '_') continue;
 
-          const safeFile = path.basename(rel)
+          const safeFile = path
+            .basename(rel)
             .replace('.md', '')
             .replace(/[^a-zA-Z0-9\-_]/g, '_')
             .slice(0, 30)
@@ -81,7 +82,9 @@ export class MarkdownScanner implements Scanner {
             },
           });
         }
-      } catch { /* skip unreadable */ }
+      } catch {
+        /* skip unreadable */
+      }
     }
 
     return units;
@@ -101,7 +104,12 @@ export class MarkdownScanner implements Scanner {
         const rel = path.relative(projectRoot, abs);
 
         if (entry.isDirectory()) {
-          if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'target') continue;
+          if (
+            entry.name.startsWith('.') ||
+            entry.name === 'node_modules' ||
+            entry.name === 'target'
+          )
+            continue;
           walk(abs);
         } else if (entry.name.endsWith('.md') && !entry.name.startsWith('.')) {
           files.push(rel);

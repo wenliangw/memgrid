@@ -38,13 +38,16 @@ export class RustScanner implements Scanner {
       const rel = relPrefix ? path.join(relPrefix, entry.name) : entry.name;
 
       if (entry.isDirectory()) {
-        if (entry.name.startsWith('.') || entry.name === 'target' || entry.name === 'node_modules') continue;
+        if (entry.name.startsWith('.') || entry.name === 'target' || entry.name === 'node_modules')
+          continue;
         await this.scanDir(abs, rel, units);
       } else if (entry.name.endsWith('.rs')) {
         try {
           const code = fs.readFileSync(abs, 'utf-8');
           this.parseRustFile(code, rel, units);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
     }
   }
@@ -58,7 +61,9 @@ export class RustScanner implements Scanner {
       const line = lines[i].trim();
 
       // fn name(params) -> ReturnType {
-      let match = line.match(/^(?:pub(?:\s*\(\s*crate\s*\))?\s+)?(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)\s*(?:->\s*([^{]+?))?\s*\{/);
+      let match = line.match(
+        /^(?:pub(?:\s*\(\s*crate\s*\))?\s+)?(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(([^)]*)\)\s*(?:->\s*([^{]+?))?\s*\{/,
+      );
       if (match) {
         const fnName = match[1];
         if (fnName === 'main' || fnName.startsWith('test_')) continue;
@@ -188,7 +193,7 @@ export class RustScanner implements Scanner {
       .replace(/::/g, '_')
       .replace(/\./g, '_')
       .replace(/<[^>]*>/g, '')
-      .replace(/[^a-zA-Z0-9_\-]/g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
       .replace(/_+/g, '_')
       .toLowerCase()
       .replace(/^_|_$/g, '');

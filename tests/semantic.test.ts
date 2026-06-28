@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SemanticRetriever, KeywordEmbeddingProvider, APIEmbeddingProvider } from '../src/retrieve/semantic.js';
+import {
+  SemanticRetriever,
+  KeywordEmbeddingProvider,
+  APIEmbeddingProvider,
+} from '../src/retrieve/semantic.js';
 import { FileStore } from '../src/store/file-store.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -47,9 +51,19 @@ describe('SemanticRetriever', () => {
   });
 
   it('uses keyword embedding for scoring diversity', async () => {
-    store.saveUnit(makeUnit('u1', 'user authentication service', 'Handles login, tokens, and session management'));
-    store.saveUnit(makeUnit('u2', 'file upload controller', 'Handles multipart uploads to cloud storage'));
-    store.saveUnit(makeUnit('u3', 'user profile query', 'Fetches user profile with avatar and bio'));
+    store.saveUnit(
+      makeUnit(
+        'u1',
+        'user authentication service',
+        'Handles login, tokens, and session management',
+      ),
+    );
+    store.saveUnit(
+      makeUnit('u2', 'file upload controller', 'Handles multipart uploads to cloud storage'),
+    );
+    store.saveUnit(
+      makeUnit('u3', 'user profile query', 'Fetches user profile with avatar and bio'),
+    );
 
     await retriever.buildIndex();
 

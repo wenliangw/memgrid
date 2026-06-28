@@ -9,7 +9,9 @@ class LRUCache<K, V> {
   private map = new Map<K, V>();
   constructor(private max: number = 200) {}
 
-  get(key: K): V | undefined { return this.map.get(key); }
+  get(key: K): V | undefined {
+    return this.map.get(key);
+  }
   set(key: K, value: V): void {
     if (this.map.size >= this.max) {
       const first = this.map.keys().next().value as K;
@@ -17,7 +19,9 @@ class LRUCache<K, V> {
     }
     this.map.set(key, value);
   }
-  clear(): void { this.map.clear(); }
+  clear(): void {
+    this.map.clear();
+  }
 }
 
 export class RetrieveEngine {
@@ -217,7 +221,9 @@ export class RetrieveEngine {
       lines.push(`### ${unit.id} (${unit.type})`);
       lines.push(`- **${unit.summary}**`);
       if (unit.source) {
-        lines.push(`- location: \`${unit.source.file}\`${unit.source.lines ? `:${unit.source.lines}` : ''}`);
+        lines.push(
+          `- location: \`${unit.source.file}\`${unit.source.lines ? `:${unit.source.lines}` : ''}`,
+        );
       }
       if (unit.content.inputs && unit.content.inputs !== 'none') {
         lines.push(`- inputs: ${unit.content.inputs}`);

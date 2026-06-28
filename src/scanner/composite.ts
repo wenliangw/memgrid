@@ -38,9 +38,7 @@ export class CompositeScanner implements Scanner {
     const units: MemoryUnit[] = [];
 
     // Run all scanners in parallel
-    const results = await Promise.all(
-      this.scanners.map((s) => s.scan(options)),
-    );
+    const results = await Promise.all(this.scanners.map((s) => s.scan(options)));
 
     for (const result of results) {
       units.push(...result);
@@ -59,9 +57,7 @@ export class CompositeScanner implements Scanner {
 
     // Only scanners that support incremental scan
     const results = await Promise.all(
-      this.scanners
-        .filter((s) => s.scanFiles)
-        .map((s) => s.scanFiles!(files, options)),
+      this.scanners.filter((s) => s.scanFiles).map((s) => s.scanFiles!(files, options)),
     );
 
     for (const result of results) {

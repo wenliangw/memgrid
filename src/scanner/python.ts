@@ -53,10 +53,19 @@ export class PythonScanner implements Scanner {
       const rel = relPrefix ? path.join(relPrefix, entry.name) : entry.name;
 
       if (entry.isDirectory()) {
-        if (entry.name.startsWith('.') || entry.name === '__pycache__' || entry.name === 'node_modules') continue;
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === '__pycache__' ||
+          entry.name === 'node_modules'
+        )
+          continue;
         if (entry.name === 'tests' || entry.name === 'test') continue;
         await this.scanDir(abs, rel, units);
-      } else if (entry.name.endsWith('.py') && !entry.name.startsWith('test_') && !entry.name.endsWith('_test.py')) {
+      } else if (
+        entry.name.endsWith('.py') &&
+        !entry.name.startsWith('test_') &&
+        !entry.name.endsWith('_test.py')
+      ) {
         try {
           const code = fs.readFileSync(abs, 'utf-8');
           this.parsePythonFile(code, rel, units);
@@ -121,7 +130,10 @@ export class PythonScanner implements Scanner {
       const funcMatch = stripped.match(funcPattern);
       if (funcMatch) {
         const funcName = funcMatch[1];
-        if (funcName.startsWith('_') && funcName !== '__init__') { decorators = []; continue; } // skip private
+        if (funcName.startsWith('_') && funcName !== '__init__') {
+          decorators = [];
+          continue;
+        } // skip private
 
         const params = funcMatch[2];
         const returnType = funcMatch[3] || '';
@@ -189,7 +201,7 @@ export class PythonScanner implements Scanner {
     return text
       .replace(/\./g, '_')
       .replace(/__/g, '_dunder_')
-      .replace(/[^a-zA-Z0-9_\-]/g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
       .replace(/_+/g, '_')
       .toLowerCase()
       .replace(/^_|_$/g, '');

@@ -17,8 +17,7 @@ export class TypeScriptScanner implements Scanner {
 
   detect(projectRoot: string): boolean {
     return (
-      fs.existsSync(path.join(projectRoot, 'tsconfig.json')) ||
-      this.findSourceDirs().length > 0
+      fs.existsSync(path.join(projectRoot, 'tsconfig.json')) || this.findSourceDirs().length > 0
     );
   }
 
@@ -84,7 +83,12 @@ export class TypeScriptScanner implements Scanner {
       const filePath = path.relative(this.projectRoot, sourceFile.getFilePath());
 
       // Skip test files, node_modules, dist, .next
-      if (filePath.includes('node_modules') || filePath.includes('dist') || filePath.includes('.next')) continue;
+      if (
+        filePath.includes('node_modules') ||
+        filePath.includes('dist') ||
+        filePath.includes('.next')
+      )
+        continue;
       if (filePath.endsWith('.spec.ts') || filePath.endsWith('.test.ts')) continue;
 
       // Extract classes with public methods
@@ -107,7 +111,11 @@ export class TypeScriptScanner implements Scanner {
           const returnType = method.getReturnType().getText();
 
           const unit: MemoryUnit = {
-            id: `method_${signature.toLowerCase().replace(/\./g, '_').replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_')}`,
+            id: `method_${signature
+              .toLowerCase()
+              .replace(/\./g, '_')
+              .replace(/[^a-z0-9_]/g, '_')
+              .replace(/_+/g, '_')}`,
             type: 'method',
             summary: `${signature} — ${this.extractJsDoc(method)}`,
             source: {
@@ -202,9 +210,18 @@ export class TypeScriptScanner implements Scanner {
 
         if (!title || body.length < 50) continue;
 
-        const safeTitle = title.replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 50).toLowerCase();
+        const safeTitle = title
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .replace(/_+/g, '_')
+          .slice(0, 50)
+          .toLowerCase();
         if (!safeTitle || safeTitle === '_') continue;
-        const safeFile = file.replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
+        const safeFile = file
+          .replace('.md', '')
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .replace(/_+/g, '_')
+          .slice(0, 30)
+          .toLowerCase();
 
         const unit: MemoryUnit = {
           id: `rule_${safeFile}_${safeTitle}`,
@@ -229,7 +246,12 @@ export class TypeScriptScanner implements Scanner {
       }
 
       // Also create a rule_trigger unit
-      const safeFile = file.replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
+      const safeFile = file
+        .replace('.md', '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 30)
+        .toLowerCase();
       const triggerUnit: MemoryUnit = {
         id: `trigger_rule_${safeFile}`,
         type: 'rule_trigger',
@@ -266,7 +288,7 @@ export class TypeScriptScanner implements Scanner {
       if (!fs.existsSync(dir)) return;
       for (const file of fs.readdirSync(dir)) {
         if (!file.endsWith('.ts')) continue;
-        if (file.startsWith("_TEMPLATE")) continue;
+        if (file.startsWith('_TEMPLATE')) continue;
         const filePath = path.join(dir, file);
         const content = fs.readFileSync(filePath, 'utf-8');
         const relativePath = path.relative(this.projectRoot, filePath);
@@ -313,9 +335,17 @@ export class TypeScriptScanner implements Scanner {
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
       const keyDeps = Object.entries(deps as Record<string, string>)
         .filter(([name]) =>
-          ['next', 'react', 'nestjs', 'typeorm', 'chakra', 'zustand', 'swr', 'pnpm', 'typescript'].some((k) =>
-            name.includes(k),
-          ),
+          [
+            'next',
+            'react',
+            'nestjs',
+            'typeorm',
+            'chakra',
+            'zustand',
+            'swr',
+            'pnpm',
+            'typescript',
+          ].some((k) => name.includes(k)),
         )
         .map(([name, ver]) => `${name}@${ver}`);
 
@@ -368,7 +398,10 @@ export class TypeScriptScanner implements Scanner {
   }
 
   private sanitizeId(text: string): string {
-    return text.replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_").toLowerCase();
+    return text
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .toLowerCase();
   }
 
   private buildAssociations(units: MemoryUnit[]): void {
@@ -447,7 +480,11 @@ export class TypeScriptScanner implements Scanner {
       const configKeywords = config.signatures;
       for (const method of methodUnits) {
         const snippet = (method.content.code_snippet || '') + (method.content.description || '');
-        if (configKeywords.some((k) => snippet.toLowerCase().includes(k.toLowerCase()) && k.length > 3)) {
+        if (
+          configKeywords.some(
+            (k) => snippet.toLowerCase().includes(k.toLowerCase()) && k.length > 3,
+          )
+        ) {
           method.associations.push({
             to: config.id,
             relation: 'calls',
@@ -529,9 +566,9 @@ export class TypeScriptScanner implements Scanner {
 
     // Match function calls: foo(...), await foo(...), this.foo(...), obj.foo(...)
     const callPatterns = [
-      /\b(\w+)\s*\(/g,           // direct calls: foo()
-      /this\.(\w+)\s*\(/g,        // this.foo()
-      /(\w+)\.(\w+)\s*\(/g,      // obj.method() — captures both obj and method
+      /\b(\w+)\s*\(/g, // direct calls: foo()
+      /this\.(\w+)\s*\(/g, // this.foo()
+      /(\w+)\.(\w+)\s*\(/g, // obj.method() — captures both obj and method
     ];
 
     for (const pattern of callPatterns) {
@@ -552,7 +589,10 @@ export class TypeScriptScanner implements Scanner {
       // Extract individual imported names
       const namesStr = match[0].match(/\{([^}]*)\}/)?.[1] || '';
       for (const n of namesStr.split(',')) {
-        const clean = n.trim().split(/\s+as\s+/)[0].trim();
+        const clean = n
+          .trim()
+          .split(/\s+as\s+/)[0]
+          .trim();
         if (clean && clean.length > 2) names.add(clean);
       }
     }
@@ -562,12 +602,53 @@ export class TypeScriptScanner implements Scanner {
 
   private isCommonKeyword(name: string): boolean {
     const keywords = new Set([
-      'if', 'for', 'let', 'var', 'new', 'try', 'const', 'typeof', 'instanceof',
-      'return', 'throw', 'await', 'async', 'while', 'switch', 'catch', 'finally',
-      'export', 'import', 'from', 'require', 'default', 'function', 'class',
-      'true', 'false', 'null', 'undefined', 'this', 'super', 'void', 'delete',
-      'map', 'filter', 'reduce', 'find', 'forEach', 'push', 'pop', 'slice',
-      'split', 'join', 'concat', 'sort', 'some', 'every', 'includes',
+      'if',
+      'for',
+      'let',
+      'var',
+      'new',
+      'try',
+      'const',
+      'typeof',
+      'instanceof',
+      'return',
+      'throw',
+      'await',
+      'async',
+      'while',
+      'switch',
+      'catch',
+      'finally',
+      'export',
+      'import',
+      'from',
+      'require',
+      'default',
+      'function',
+      'class',
+      'true',
+      'false',
+      'null',
+      'undefined',
+      'this',
+      'super',
+      'void',
+      'delete',
+      'map',
+      'filter',
+      'reduce',
+      'find',
+      'forEach',
+      'push',
+      'pop',
+      'slice',
+      'split',
+      'join',
+      'concat',
+      'sort',
+      'some',
+      'every',
+      'includes',
     ]);
     return keywords.has(name);
   }

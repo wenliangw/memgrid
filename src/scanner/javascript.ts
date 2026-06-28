@@ -19,10 +19,7 @@ export class JavaScriptScanner implements Scanner {
     const hasTS = fs.existsSync(path.join(projectRoot, 'tsconfig.json'));
     if (hasTS) return false; // let TypeScriptScanner handle it
 
-    const hasJS = (
-      fs.existsSync(path.join(projectRoot, 'package.json')) &&
-      !hasTS
-    );
+    const hasJS = fs.existsSync(path.join(projectRoot, 'package.json')) && !hasTS;
     if (!hasJS) return false;
 
     // Quick check: any .js/.mjs/.cjs files?
@@ -52,8 +49,11 @@ export class JavaScriptScanner implements Scanner {
         if (entry.name === '__tests__' || entry.name === 'test') continue;
         await this.scanDir(abs, rel, units);
       } else if (
-        (entry.name.endsWith('.js') || entry.name.endsWith('.mjs') || entry.name.endsWith('.cjs')) &&
-        !entry.name.includes('.test.') && !entry.name.includes('.spec.')
+        (entry.name.endsWith('.js') ||
+          entry.name.endsWith('.mjs') ||
+          entry.name.endsWith('.cjs')) &&
+        !entry.name.includes('.test.') &&
+        !entry.name.includes('.spec.')
       ) {
         try {
           const code = fs.readFileSync(abs, 'utf-8');
@@ -182,7 +182,9 @@ export class JavaScriptScanner implements Scanner {
           if (this.hasJSFiles(path.join(dir, entry.name))) return true;
         }
       }
-    } catch { /* permission error */ }
+    } catch {
+      /* permission error */
+    }
     return false;
   }
 }

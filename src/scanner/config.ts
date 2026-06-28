@@ -36,8 +36,19 @@ export class ConfigScanner implements Scanner {
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
         const keyDeps = Object.entries(deps as Record<string, string>)
           .filter(([name]) =>
-            ['next', 'react', 'nestjs', 'typeorm', 'chakra', 'zustand',
-             'swr', 'pnpm', 'typescript', 'express', 'fastify', 'prisma',
+            [
+              'next',
+              'react',
+              'nestjs',
+              'typeorm',
+              'chakra',
+              'zustand',
+              'swr',
+              'pnpm',
+              'typescript',
+              'express',
+              'fastify',
+              'prisma',
             ].some((k) => name.includes(k)),
           )
           .map(([name, ver]) => `${name}@${ver}`);
@@ -60,7 +71,9 @@ export class ConfigScanner implements Scanner {
             },
           });
         }
-      } catch { /* JSON parse error, skip */ }
+      } catch {
+        /* JSON parse error, skip */
+      }
     }
 
     // pyproject.toml (Python)
@@ -70,7 +83,9 @@ export class ConfigScanner implements Scanner {
         const content = fs.readFileSync(pyProjectPath, 'utf-8');
         const depsMatch = content.match(/dependencies\s*=\s*\[([\s\S]*?)\]/);
         const optDeps = content.match(/optional-dependencies\s*=\s*\{/);
-        const deps = depsMatch ? depsMatch[1].match(/"([^"]+)"/g)?.map((d) => d.replace(/"/g, '')) || [] : [];
+        const deps = depsMatch
+          ? depsMatch[1].match(/"([^"]+)"/g)?.map((d) => d.replace(/"/g, '')) || []
+          : [];
 
         units.push({
           id: 'config_tech_stack_python',
@@ -88,7 +103,9 @@ export class ConfigScanner implements Scanner {
             status: 'active',
           },
         });
-      } catch { /* parse error, skip */ }
+      } catch {
+        /* parse error, skip */
+      }
     }
 
     // go.mod (Go)
@@ -97,7 +114,11 @@ export class ConfigScanner implements Scanner {
       const content = fs.readFileSync(goModPath, 'utf-8');
       const moduleMatch = content.match(/^module\s+(\S+)/m);
       const goMatch = content.match(/^go\s+(\S+)/m);
-      const deps = content.match(/^\s+(\S+)\s+v[\d.]+/gm)?.map((l) => l.trim().split(/\s+/)[0]).slice(0, 10) || [];
+      const deps =
+        content
+          .match(/^\s+(\S+)\s+v[\d.]+/gm)
+          ?.map((l) => l.trim().split(/\s+/)[0])
+          .slice(0, 10) || [];
 
       units.push({
         id: 'config_tech_stack_go',
@@ -124,8 +145,11 @@ export class ConfigScanner implements Scanner {
     if (fs.existsSync(cargoPath)) {
       const content = fs.readFileSync(cargoPath, 'utf-8');
       const nameMatch = content.match(/^name\s*=\s*"([^"]+)"/m);
-      const deps = content.match(/(\[dependencies.*?\n)([\s\S]*?)(?=\n\[|$)/)?.[2]
-        ?.match(/^(\w+)\s*=/gm)?.map((d) => d.replace(' =', '').trim()) || [];
+      const deps =
+        content
+          .match(/(\[dependencies.*?\n)([\s\S]*?)(?=\n\[|$)/)?.[2]
+          ?.match(/^(\w+)\s*=/gm)
+          ?.map((d) => d.replace(' =', '').trim()) || [];
 
       units.push({
         id: 'config_tech_stack_rust',

@@ -36,10 +36,18 @@ export class FileStore {
 
   // ===== Path helpers =====
 
-  get gridDir(): string { return path.join(this.projectRoot, GRID_DIR); }
-  get unitsDir(): string { return path.join(this.gridDir, UNITS_DIR); }
-  get archiveDir(): string { return path.join(this.gridDir, ARCHIVE_DIR); }
-  get meshPath(): string { return path.join(this.gridDir, MESH_FILE); }
+  get gridDir(): string {
+    return path.join(this.projectRoot, GRID_DIR);
+  }
+  get unitsDir(): string {
+    return path.join(this.gridDir, UNITS_DIR);
+  }
+  get archiveDir(): string {
+    return path.join(this.gridDir, ARCHIVE_DIR);
+  }
+  get meshPath(): string {
+    return path.join(this.gridDir, MESH_FILE);
+  }
 
   unitPath(id: string): string {
     return path.join(this.unitsDir, `${id}.json`);
@@ -113,7 +121,9 @@ export class FileStore {
     };
   }
 
-  reload(): void { this.load(); }
+  reload(): void {
+    this.load();
+  }
 
   // ===== Unit read (from cache) =====
 
@@ -197,9 +207,7 @@ export class FileStore {
     for (const id of this.dirtyUsage) {
       const unit = this.cache.get(id) || this.archiveCache.get(id);
       if (unit) {
-        const filePath = unit.meta.status === 'archived'
-          ? this.archivePath(id)
-          : this.unitPath(id);
+        const filePath = unit.meta.status === 'archived' ? this.archivePath(id) : this.unitPath(id);
         if (fs.existsSync(filePath)) {
           fs.writeFileSync(filePath, JSON.stringify(unit, null, 2), 'utf-8');
           synced++;
@@ -212,7 +220,8 @@ export class FileStore {
 
   saveUnits(units: MemoryUnit[]): { written: number; skipped: number } {
     this.ensureLoaded();
-    let written = 0, skipped = 0;
+    let written = 0,
+      skipped = 0;
 
     for (const unit of units) {
       const existing = this.cache.get(unit.id);

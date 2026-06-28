@@ -13,12 +13,16 @@ import type { MemoryUnit, SearchResult } from '../shared/types.js';
 class LRUCache<K, V> {
   private map = new Map<K, V>();
   constructor(private max: number = 100) {}
-  get(key: K): V | undefined { return this.map.get(key); }
+  get(key: K): V | undefined {
+    return this.map.get(key);
+  }
   set(key: K, value: V): void {
     if (this.map.size >= this.max) this.map.delete(this.map.keys().next().value as K);
     this.map.set(key, value);
   }
-  clear(): void { this.map.clear(); }
+  clear(): void {
+    this.map.clear();
+  }
 }
 
 export interface EmbeddingProvider {
@@ -70,8 +74,8 @@ export class SemanticRetriever {
 
     for (let i = 0; i < units.length; i += batchSize) {
       const batch = units.slice(i, i + batchSize);
-      const texts = batch.map(
-        (u) => `${u.summary}. ${u.content.description}. ${u.signatures.join(' ')}`.slice(0, 500),
+      const texts = batch.map((u) =>
+        `${u.summary}. ${u.content.description}. ${u.signatures.join(' ')}`.slice(0, 500),
       );
 
       try {
@@ -154,9 +158,7 @@ export class SemanticRetriever {
     }
 
     // Sort and take top N
-    const ranked = [...merged.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, maxResults);
+    const ranked = [...merged.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxResults);
 
     const resultUnits = ranked
       .map(([id]) => allKeywordUnits.get(id))
@@ -245,7 +247,7 @@ export class KeywordEmbeddingProvider implements EmbeddingProvider {
 
 /**
  * Provider that calls an external embedding API (OpenAI-compatible format).
- * 
+ *
  * Usage:
  *   const provider = new APIEmbeddingProvider('https://api.deepseek.com/v1/embeddings', 'sk-...');
  */
@@ -256,7 +258,12 @@ export class APIEmbeddingProvider implements EmbeddingProvider {
   private apiKey: string;
   private model: string;
 
-  constructor(baseUrl: string, apiKey: string, model = 'text-embedding-3-small', dimensions = 1536) {
+  constructor(
+    baseUrl: string,
+    apiKey: string,
+    model = 'text-embedding-3-small',
+    dimensions = 1536,
+  ) {
     this.baseUrl = baseUrl;
     this.apiKey = apiKey;
     this.model = model;
@@ -268,7 +275,7 @@ export class APIEmbeddingProvider implements EmbeddingProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
         model: this.model,
@@ -280,7 +287,7 @@ export class APIEmbeddingProvider implements EmbeddingProvider {
       throw new Error(`Embedding API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
     return data.data.map((item: any) => item.embedding);
   }
 }

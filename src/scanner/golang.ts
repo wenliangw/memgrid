@@ -25,7 +25,8 @@ export class GoScanner implements Scanner {
 
     // If no src dirs, scan root-level .go files
     if (srcDirs.length === 0) {
-      const rootFiles = fs.readdirSync(this.projectRoot)
+      const rootFiles = fs
+        .readdirSync(this.projectRoot)
         .filter((f) => f.endsWith('.go') && !f.endsWith('_test.go'));
       for (const file of rootFiles) {
         try {
@@ -34,7 +35,9 @@ export class GoScanner implements Scanner {
             file,
             units,
           );
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
     }
 
@@ -53,13 +56,16 @@ export class GoScanner implements Scanner {
       const rel = relPrefix ? path.join(relPrefix, entry.name) : entry.name;
 
       if (entry.isDirectory()) {
-        if (entry.name.startsWith('.') || entry.name === 'vendor' || entry.name === 'node_modules') continue;
+        if (entry.name.startsWith('.') || entry.name === 'vendor' || entry.name === 'node_modules')
+          continue;
         await this.scanDir(abs, rel, units);
       } else if (entry.name.endsWith('.go') && !entry.name.endsWith('_test.go')) {
         try {
           const code = fs.readFileSync(abs, 'utf-8');
           this.parseGoFile(code, rel, units);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
     }
   }
@@ -71,10 +77,11 @@ export class GoScanner implements Scanner {
       const line = lines[i].trim();
 
       // func Name(params) returnType {
-      let match = line.match(/^func\s+(\w+)\s*\(([^)]*)\)\s*(\(?[\w\[\]\*\.]+\)?)?\s*\{/);
+      let match = line.match(/^func\s+(\w+)\s*\(([^)]*)\)\s*(\(?[\w[\]*.]+\)?)?\s*\{/);
       if (match) {
         const funcName = match[1];
-        if (funcName[0] === funcName[0].toLowerCase() && !this.isStructMethod(line, funcName)) continue; // skip unexported (unless struct method)
+        if (funcName[0] === funcName[0].toLowerCase() && !this.isStructMethod(line, funcName))
+          continue; // skip unexported (unless struct method)
         const params = match[2];
         const ret = match[3] || '';
         units.push({
@@ -101,7 +108,9 @@ export class GoScanner implements Scanner {
       }
 
       // func (receiver Type) methodName(params) returnType {
-      match = line.match(/^func\s+\((\w+)\s+\*?(\w+)\)\s+(\w+)\s*\(([^)]*)\)\s*(\(?[\w\[\]\*\.]+\)?)?\s*\{/);
+      match = line.match(
+        /^func\s+\((\w+)\s+\*?(\w+)\)\s+(\w+)\s*\(([^)]*)\)\s*(\(?[\w[\]*.]+\)?)?\s*\{/,
+      );
       if (match) {
         const receiverName = match[1];
         const receiverType = match[2];
@@ -201,7 +210,7 @@ export class GoScanner implements Scanner {
     return text
       .replace(/\./g, '_')
       .replace(/\*/g, 'ptr_')
-      .replace(/[^a-zA-Z0-9_\-]/g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
       .replace(/_+/g, '_')
       .toLowerCase()
       .replace(/^_|_$/g, '');

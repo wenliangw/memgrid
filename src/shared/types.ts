@@ -47,14 +47,14 @@ export interface MemoryUnit {
     dependencies?: string[];
     code_snippet?: string;
     style_notes?: string;
-    trigger?: string;       // for trigger types: "when to use"
-    action?: string;        // for trigger types: "what to do"
+    trigger?: string; // for trigger types: "when to use"
+    action?: string; // for trigger types: "what to do"
   };
   associations: Association[];
   meta: {
     created: string;
     updated: string;
-    confidence: number;     // 0.0 ~ 1.0
+    confidence: number; // 0.0 ~ 1.0
     usage_count: number;
     status: 'active' | 'stale' | 'archived';
   };

@@ -1,7 +1,15 @@
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import * as path from 'path';
-import type { MemoryUnit, ScanOptions, SearchOptions, SearchResult, SyncOptions, SyncResult, FileSnapshot } from './shared/types.js';
+import type {
+  MemoryUnit,
+  ScanOptions,
+  SearchOptions,
+  SearchResult,
+  SyncOptions,
+  SyncResult,
+  FileSnapshot,
+} from './shared/types.js';
 import { FileStore } from './store/file-store.js';
 import {
   TypeScriptScanner,
@@ -11,7 +19,11 @@ import {
   type Scanner,
 } from './scanner/index.js';
 import { RetrieveEngine } from './retrieve/index.js';
-import { SemanticRetriever, type EmbeddingProvider, KeywordEmbeddingProvider } from './retrieve/semantic.js';
+import {
+  SemanticRetriever,
+  type EmbeddingProvider,
+  KeywordEmbeddingProvider,
+} from './retrieve/semantic.js';
 import { LearnEngine, type TaskResult, type LearningSuggestions } from './learn/index.js';
 import { SyncEngine } from './sync/index.js';
 
@@ -75,7 +87,18 @@ export class MemGrid {
   private saveFileSnapshot(options: ScanOptions): void {
     const snapshot: FileSnapshot = {};
 
-    const sourceExts = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.go', '.rs', '.md']);
+    const sourceExts = new Set([
+      '.ts',
+      '.tsx',
+      '.js',
+      '.jsx',
+      '.mjs',
+      '.cjs',
+      '.py',
+      '.go',
+      '.rs',
+      '.md',
+    ]);
     const testPatterns = ['.spec.', '.test.', '_test.'];
 
     const collectHashes = (dir: string) => {
@@ -84,7 +107,14 @@ export class MemGrid {
         const abs = path.join(dir, entry.name);
         const rel = path.relative(this.projectRoot, abs);
         if (entry.isDirectory()) {
-          const skipDirs = new Set(['node_modules', 'dist', '.next', 'vendor', 'target', '__pycache__']);
+          const skipDirs = new Set([
+            'node_modules',
+            'dist',
+            '.next',
+            'vendor',
+            'target',
+            '__pycache__',
+          ]);
           if (!skipDirs.has(entry.name) && !entry.name.startsWith('.')) {
             collectHashes(abs);
           }
@@ -93,15 +123,18 @@ export class MemGrid {
           if (sourceExts.has(ext)) {
             // Skip test files
             if (testPatterns.some((p) => entry.name.includes(p))) continue;
-            snapshot[rel] = crypto.createHash('sha256').update(fs.readFileSync(abs, 'utf-8')).digest('hex');
+            snapshot[rel] = crypto
+              .createHash('sha256')
+              .update(fs.readFileSync(abs, 'utf-8'))
+              .digest('hex');
           }
         }
       }
     };
 
     // Scan source dirs
-    ['apps', 'packages', 'src', 'lib', 'cmd', 'internal', 'pkg', 'app'].forEach(
-      (d) => collectHashes(path.join(this.projectRoot, d)),
+    ['apps', 'packages', 'src', 'lib', 'cmd', 'internal', 'pkg', 'app'].forEach((d) =>
+      collectHashes(path.join(this.projectRoot, d)),
     );
 
     // Rules and examples
@@ -109,10 +142,19 @@ export class MemGrid {
     if (options.includeExamples) collectHashes(path.join(this.projectRoot, '.claude', 'examples'));
 
     // Config files
-    for (const f of ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'docker-compose.yml']) {
+    for (const f of [
+      'package.json',
+      'pyproject.toml',
+      'go.mod',
+      'Cargo.toml',
+      'docker-compose.yml',
+    ]) {
       const abs = path.join(this.projectRoot, f);
       if (fs.existsSync(abs)) {
-        snapshot[f] = crypto.createHash('sha256').update(fs.readFileSync(abs, 'utf-8')).digest('hex');
+        snapshot[f] = crypto
+          .createHash('sha256')
+          .update(fs.readFileSync(abs, 'utf-8'))
+          .digest('hex');
       }
     }
 
@@ -132,7 +174,14 @@ export class MemGrid {
     return result;
   }
 
-  async add(unit: Partial<MemoryUnit> & { id: string; type: MemoryUnit['type']; summary: string; content: MemoryUnit['content'] }): Promise<MemoryUnit> {
+  async add(
+    unit: Partial<MemoryUnit> & {
+      id: string;
+      type: MemoryUnit['type'];
+      summary: string;
+      content: MemoryUnit['content'];
+    },
+  ): Promise<MemoryUnit> {
     const fullUnit: MemoryUnit = {
       ...unit,
       signatures: unit.signatures || [],

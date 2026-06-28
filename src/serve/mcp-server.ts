@@ -9,9 +9,17 @@ import { MemGrid } from '../memgrid.js';
 import type { MemoryUnitType } from '../shared/types.js';
 
 const VALID_TYPES: MemoryUnitType[] = [
-  'method', 'component', 'pattern', 'config', 'error_solution',
-  'decision', 'skill_trigger', 'mcp_trigger', 'rule_trigger',
-  'style_preference', 'architecture_principle',
+  'method',
+  'component',
+  'pattern',
+  'config',
+  'error_solution',
+  'decision',
+  'skill_trigger',
+  'mcp_trigger',
+  'rule_trigger',
+  'style_preference',
+  'architecture_principle',
 ];
 
 export class MemGridServer {
@@ -58,7 +66,8 @@ export class MemGridServer {
               },
               semanticWeight: {
                 type: 'number',
-                description: 'Hybrid search: 0.0 = keyword only, 1.0 = semantic only (default: 0.4)',
+                description:
+                  'Hybrid search: 0.0 = keyword only, 1.0 = semantic only (default: 0.4)',
                 default: 0.4,
               },
             },
@@ -76,7 +85,8 @@ export class MemGridServer {
             properties: {
               type: {
                 type: 'string',
-                description: 'Unit type: method, pattern, config, error_solution, decision, ' +
+                description:
+                  'Unit type: method, pattern, config, error_solution, decision, ' +
                   'skill_trigger, mcp_trigger, rule_trigger, style_preference, architecture_principle',
                 enum: VALID_TYPES,
               },
@@ -174,12 +184,24 @@ export class MemGridServer {
           }
 
           case 'memgrid_add': {
-            const { type, summary, description, sourceFile, codeSnippet, styleNotes, associations } =
-              args as any;
+            const {
+              type,
+              summary,
+              description,
+              sourceFile,
+              codeSnippet,
+              styleNotes,
+              associations,
+            } = args as any;
 
             if (!VALID_TYPES.includes(type)) {
               return {
-                content: [{ type: 'text', text: `Invalid type: "${type}". Must be one of: ${VALID_TYPES.join(', ')}` }],
+                content: [
+                  {
+                    type: 'text',
+                    text: `Invalid type: "${type}". Must be one of: ${VALID_TYPES.join(', ')}`,
+                  },
+                ],
                 isError: true,
               };
             }
@@ -224,9 +246,7 @@ export class MemGridServer {
             // Suggest new method units for modified files
             if (filesModified && filesModified.length > 0) {
               const existingFiles = new Set(
-                result.units
-                  .filter((u) => u.source?.file)
-                  .map((u) => u.source!.file),
+                result.units.filter((u) => u.source?.file).map((u) => u.source!.file),
               );
               const newFiles = filesModified.filter((f: string) => !existingFiles.has(f));
 
@@ -252,7 +272,11 @@ export class MemGridServer {
 
             // Suggest error_solution if outcome mentions fixes
             const fixKeywords = ['fix', 'bug', 'error', 'OOM', 'crash', '修复', '错误'];
-            if (fixKeywords.some((k) => taskSummary.toLowerCase().includes(k) || outcome.toLowerCase().includes(k))) {
+            if (
+              fixKeywords.some(
+                (k) => taskSummary.toLowerCase().includes(k) || outcome.toLowerCase().includes(k),
+              )
+            ) {
               suggestions.push('### 🐛 Suggested error_solution unit:');
               suggestions.push(`- Record this fix: what was the error, and what was the solution?`);
               suggestions.push(`- Use \`memgrid_add --type error_solution\` to add it.`);
@@ -260,7 +284,14 @@ export class MemGridServer {
             }
 
             // Suggest decision unit if the task seems architectural
-            const decisionKeywords = ['refactor', 'architecture', 'pattern', 'design', '重构', '架构'];
+            const decisionKeywords = [
+              'refactor',
+              'architecture',
+              'pattern',
+              'design',
+              '重构',
+              '架构',
+            ];
             if (decisionKeywords.some((k) => taskSummary.includes(k))) {
               suggestions.push('### 🎯 Suggested decision unit:');
               suggestions.push('- Record why this architectural decision was made.');
@@ -269,7 +300,9 @@ export class MemGridServer {
             }
 
             if (suggestions.length <= 2) {
-              suggestions.push('No strong suggestions. The grid may not need updates for this task.');
+              suggestions.push(
+                'No strong suggestions. The grid may not need updates for this task.',
+              );
             }
 
             return {

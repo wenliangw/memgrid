@@ -1,7 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import type { MemoryUnit, MemoryGrid, FileSnapshot, SyncResult, SyncOptions, Association } from '../shared/types.js';
+import type {
+  MemoryUnit,
+  MemoryGrid,
+  FileSnapshot,
+  SyncResult,
+  SyncOptions,
+  Association,
+} from '../shared/types.js';
 import type { FileStore } from '../store/file-store.js';
 import type { Scanner } from '../scanner/scanner.js';
 
@@ -9,17 +16,6 @@ import type { Scanner } from '../scanner/scanner.js';
 
 function sha256(content: string): string {
   return crypto.createHash('sha256').update(content).digest('hex');
-}
-
-function buildSnapshot(projectRoot: string, files: Iterable<string>): FileSnapshot {
-  const snapshot: FileSnapshot = {};
-  for (const file of files) {
-    const abs = path.join(projectRoot, file);
-    if (fs.existsSync(abs)) {
-      snapshot[file] = sha256(fs.readFileSync(abs, 'utf-8'));
-    }
-  }
-  return snapshot;
 }
 
 // ===== Fuzzy String Matching =====
@@ -100,10 +96,27 @@ export class SyncEngine {
     const oldSnapshot = grid?.fileSnapshot ?? {};
 
     // === Phase 1: Detect diffs ===
-    const sourceExts = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.go', '.rs', '.md']);
+    const sourceExts = new Set([
+      '.ts',
+      '.tsx',
+      '.js',
+      '.jsx',
+      '.mjs',
+      '.cjs',
+      '.py',
+      '.go',
+      '.rs',
+      '.md',
+    ]);
     const testPatterns = ['.spec.', '.test.', '_test.'];
     const skipDirs = new Set(['node_modules', 'dist', '.next', 'vendor', 'target', '__pycache__']);
-    const configFiles = ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'docker-compose.yml'];
+    const configFiles = [
+      'package.json',
+      'pyproject.toml',
+      'go.mod',
+      'Cargo.toml',
+      'docker-compose.yml',
+    ];
 
     const collectFiles = (): string[] => {
       const files: string[] = [];
@@ -129,8 +142,8 @@ export class SyncEngine {
       };
 
       // Scan source dirs
-      ['apps', 'packages', 'src', 'lib', 'cmd', 'internal', 'pkg', 'app'].forEach(
-        (d) => collect(path.join(this.projectRoot, d)),
+      ['apps', 'packages', 'src', 'lib', 'cmd', 'internal', 'pkg', 'app'].forEach((d) =>
+        collect(path.join(this.projectRoot, d)),
       );
 
       // Rules
@@ -181,7 +194,7 @@ export class SyncEngine {
 
     // === Phase 2: Re-scan changed files ===
     let updatedUnits = 0;
-    let staleUnits = 0;
+    let staleUnits: number;
 
     if (changedFiles.length > 0) {
       // Collect all existing units whose source file is in the changed set
@@ -203,10 +216,10 @@ export class SyncEngine {
       const scannedUnits = await this.scanChangedFiles(changedFiles);
 
       // Merge: try fuzzy-match scanned units to existing stale ones
-      const staleUnits = allUnits.filter((u) => u.meta.status === 'stale');
+      const staleList = allUnits.filter((u) => u.meta.status === 'stale');
 
       for (const newUnit of scannedUnits) {
-        const matched = this.fuzzyMatchUnit(newUnit, staleUnits, threshold);
+        const matched = this.fuzzyMatchUnit(newUnit, staleList, threshold);
         if (matched) {
           // Update existing unit with new content
           matched.summary = newUnit.summary;
@@ -223,7 +236,6 @@ export class SyncEngine {
           updatedUnits++;
         }
       }
-
     } // end if (changedFiles.length > 0)
 
     // Count how many stale units remain unmatched
@@ -298,14 +310,19 @@ export class SyncEngine {
 
               const methodName = method.getName();
               const signature = `${className}.${methodName}`;
-              const params = method.getParameters().map((p) => `${p.getName()}: ${p.getType().getText()}`);
+              const params = method
+                .getParameters()
+                .map((p) => `${p.getName()}: ${p.getType().getText()}`);
               const returnType = method.getReturnType().getText();
 
               units.push({
                 id: `method_${this.sanitizeId(signature)}`,
                 type: 'method',
                 summary: `${signature} — ${this.extractJsDoc(method)}`,
-                source: { file, lines: `${method.getStartLineNumber()}-${method.getEndLineNumber()}` },
+                source: {
+                  file,
+                  lines: `${method.getStartLineNumber()}-${method.getEndLineNumber()}`,
+                },
                 signatures: [signature],
                 content: {
                   description: this.extractJsDoc(method) || `${signature}()`,
@@ -331,7 +348,9 @@ export class SyncEngine {
             const funcName = func.getName();
             if (!funcName) continue;
 
-            const params = func.getParameters().map((p) => `${p.getName()}: ${p.getType().getText()}`);
+            const params = func
+              .getParameters()
+              .map((p) => `${p.getName()}: ${p.getType().getText()}`);
             const returnType = func.getReturnType().getText();
 
             units.push({
@@ -359,7 +378,12 @@ export class SyncEngine {
         }
       }
 
-      if (file.endsWith('.py') || file.endsWith('.js') || file.endsWith('.go') || file.endsWith('.rs')) {
+      if (
+        file.endsWith('.py') ||
+        file.endsWith('.js') ||
+        file.endsWith('.go') ||
+        file.endsWith('.rs')
+      ) {
         // Non-TS language files: only tracked via hash snapshot, full re-scan on next init.
         // Incremental AST parsing for these languages requires language-specific parsers.
         continue;
@@ -369,14 +393,24 @@ export class SyncEngine {
         // Rules — extract sections
         const content = fs.readFileSync(abs, 'utf-8');
         const sections = content.split(/^## /m).filter(Boolean);
-        const safeFile = path.basename(file).replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
+        const safeFile = path
+          .basename(file)
+          .replace('.md', '')
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .replace(/_+/g, '_')
+          .slice(0, 30)
+          .toLowerCase();
 
         for (const section of sections) {
           const title = section.split('\n')[0].trim();
           const body = section.split('\n').slice(1).join('\n').trim();
           if (!title || body.length < 50) continue;
 
-          const safeTitle = title.replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 50).toLowerCase();
+          const safeTitle = title
+            .replace(/[^a-zA-Z0-9_-]/g, '_')
+            .replace(/_+/g, '_')
+            .slice(0, 50)
+            .toLowerCase();
           if (!safeTitle || safeTitle === '_') continue;
 
           units.push({
@@ -425,7 +459,17 @@ export class SyncEngine {
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
         const keyDeps = Object.entries(deps as Record<string, string>)
           .filter(([name]) =>
-            ['next', 'react', 'nestjs', 'typeorm', 'chakra', 'zustand', 'swr', 'pnpm', 'typescript'].some((k) => name.includes(k)),
+            [
+              'next',
+              'react',
+              'nestjs',
+              'typeorm',
+              'chakra',
+              'zustand',
+              'swr',
+              'pnpm',
+              'typescript',
+            ].some((k) => name.includes(k)),
           )
           .map(([name, ver]) => `${name}@${ver}`);
 
@@ -462,7 +506,11 @@ export class SyncEngine {
    * 2. Same source file + high summary similarity (dice ≥ threshold)
    * 3. Same unit id (method was renamed but we kept same id pattern)
    */
-  private fuzzyMatchUnit(newUnit: MemoryUnit, staleUnits: MemoryUnit[], threshold: number): MemoryUnit | null {
+  private fuzzyMatchUnit(
+    newUnit: MemoryUnit,
+    staleUnits: MemoryUnit[],
+    threshold: number,
+  ): MemoryUnit | null {
     let bestMatch: MemoryUnit | null = null;
     let bestScore = 0;
 
@@ -524,7 +572,9 @@ export class SyncEngine {
    * 2. If match found → repair the link
    * 3. If no match → reduce weight, mark for eventual removal
    */
-  private async repairAssociations(threshold: number): Promise<{ repaired: number; broken: number }> {
+  private async repairAssociations(
+    threshold: number,
+  ): Promise<{ repaired: number; broken: number }> {
     const allUnits = await this.store.listUnits({ includeArchived: false });
     const unitMap = new Map<string, MemoryUnit>();
     const activeById = new Map<string, MemoryUnit>();
@@ -650,7 +700,11 @@ export class SyncEngine {
   // === Helpers (delegated to scanner where possible, copied for self-contained scan) ===
 
   private sanitizeId(text: string): string {
-    return text.replace(/\./g, '_').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').toLowerCase();
+    return text
+      .replace(/\./g, '_')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .toLowerCase();
   }
 
   private extractJsDoc(node: any): string {

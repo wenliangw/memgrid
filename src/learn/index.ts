@@ -3,12 +3,12 @@ import type { FileStore } from '../store/file-store.js';
 import { RetrieveEngine } from '../retrieve/index.js';
 
 export interface TaskResult {
-  summary: string;         // What was the task about?
-  outcome: string;         // What was the outcome?
+  summary: string; // What was the task about?
+  outcome: string; // What was the outcome?
   filesModified: string[]; // Files that were modified/created
-  errorsEncountered?: string[];  // Any errors and how they were fixed
-  decisions?: string[];    // Any design decisions made
-  toolsUsed?: string[];    // MCP/skill/rules used
+  errorsEncountered?: string[]; // Any errors and how they were fixed
+  decisions?: string[]; // Any design decisions made
+  toolsUsed?: string[]; // MCP/skill/rules used
   styleObservations?: string[]; // Style preferences observed
 }
 
@@ -46,9 +46,7 @@ export class LearnEngine {
     if (task.filesModified.length > 0) {
       const existingUnits = await this.store.listUnits();
       const existingFiles = new Set(
-        existingUnits
-          .filter((u) => u.source?.file)
-          .map((u) => u.source!.file),
+        existingUnits.filter((u) => u.source?.file).map((u) => u.source!.file),
       );
 
       const newFiles = task.filesModified.filter((f) => !existingFiles.has(f));
@@ -83,7 +81,9 @@ export class LearnEngine {
           },
         });
       }
-      summaries.push(`🐛 ${task.errorsEncountered.length} error(s) recorded as error_solution units`);
+      summaries.push(
+        `🐛 ${task.errorsEncountered.length} error(s) recorded as error_solution units`,
+      );
     }
 
     // 3. Suggest decision units
@@ -263,12 +263,33 @@ export class LearnEngine {
    */
   private inferDomain(summary: string): string {
     const domains: Record<string, string[]> = {
-      'server code': ['server', 'api', 'controller', 'service', 'nest', 'typeorm', 'postgres', 'database', 'auth'],
-      'frontend': ['web', 'ui', 'component', 'page', 'chakra', 'react', 'next', 'figma', 'style', 'css'],
-      'config': ['config', 'env', 'docker', 'ci', 'deploy', 'package'],
-      'review': ['pr', 'review', 'merge', 'branch'],
-      'docs': ['docs', 'readme', 'documentation'],
-      'memory': ['memory', 'grid', 'atom'],
+      'server code': [
+        'server',
+        'api',
+        'controller',
+        'service',
+        'nest',
+        'typeorm',
+        'postgres',
+        'database',
+        'auth',
+      ],
+      frontend: [
+        'web',
+        'ui',
+        'component',
+        'page',
+        'chakra',
+        'react',
+        'next',
+        'figma',
+        'style',
+        'css',
+      ],
+      config: ['config', 'env', 'docker', 'ci', 'deploy', 'package'],
+      review: ['pr', 'review', 'merge', 'branch'],
+      docs: ['docs', 'readme', 'documentation'],
+      memory: ['memory', 'grid', 'atom'],
     };
 
     const lower = summary.toLowerCase();

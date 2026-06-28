@@ -39,10 +39,19 @@ export class RulesScanner implements Scanner {
         const body = section.split('\n').slice(1).join('\n').trim();
         if (!title || body.length < 50) continue;
 
-        const safeTitle = title.replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 50).toLowerCase();
+        const safeTitle = title
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .replace(/_+/g, '_')
+          .slice(0, 50)
+          .toLowerCase();
         if (!safeTitle || safeTitle === '_') continue;
 
-        const safeFile = file.replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
+        const safeFile = file
+          .replace('.md', '')
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .replace(/_+/g, '_')
+          .slice(0, 30)
+          .toLowerCase();
 
         units.push({
           id: `rule_${safeFile}_${safeTitle}`,
@@ -63,7 +72,12 @@ export class RulesScanner implements Scanner {
       }
 
       // Also create a rule_trigger unit
-      const safeFile = file.replace('.md', '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_').slice(0, 30).toLowerCase();
+      const safeFile = file
+        .replace('.md', '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .slice(0, 30)
+        .toLowerCase();
       units.push({
         id: `trigger_rule_${safeFile}`,
         type: 'rule_trigger',
