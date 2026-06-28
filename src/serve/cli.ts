@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { MemGrid } from '../memgrid.js';
-import { TypeScriptScanner } from '../scanner/index.js';
+import {
+  TypeScriptScanner,
+  JavaScriptScanner,
+  PythonScanner,
+  GoScanner,
+  RustScanner,
+  MarkdownScanner,
+  RulesScanner,
+  ConfigScanner,
+} from '../scanner/index.js';
 import { startMCPServer } from './mcp-server.js';
 
 const program = new Command();
@@ -18,12 +27,26 @@ program
   .option('--no-rules', 'Skip scanning .claude/rules/')
   .option('--no-examples', 'Skip scanning .claude/examples/')
   .action(async (options) => {
-    // Auto-detect applicable scanners (only uses detect(), no store needed)
+    // Auto-detect applicable scanners
     const root = process.cwd();
-    const probe = new TypeScriptScanner(null as any, root);
-    const detected = probe.detect(root) ? ['typescript'] : [];
+    const languageScanners = [
+      { name: 'typescript', factory: () => new TypeScriptScanner(null as any, root) },
+      { name: 'javascript', factory: () => new JavaScriptScanner(null as any, root) },
+      { name: 'python', factory: () => new PythonScanner(null as any, root) },
+      { name: 'golang', factory: () => new GoScanner(null as any, root) },
+      { name: 'rust', factory: () => new RustScanner(null as any, root) },
+    ];
 
-    // MemGrid constructor will create full scanner with proper store
+    const detected: string[] = [];
+    for (const ls of languageScanners) {
+      if (ls.factory().detect(root)) detected.push(ls.name);
+    }
+
+    // Also detect universal scanners
+    if (new MarkdownScanner(root).detect(root)) detected.push('markdown');
+    if (options.rules !== false && new RulesScanner(root).detect(root)) detected.push('rules');
+    if (new ConfigScanner(root).detect(root)) detected.push('config');
+
     const mg = new MemGrid(root);
     console.log(`🔍 Scanning project (${detected.join(', ') || 'typescript'})...\n`);
 

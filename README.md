@@ -65,7 +65,16 @@ cd your-project
 memgrid init
 ```
 
-This scans your project (TypeScript, rules, examples, configs) and builds the initial memory grid stored in `.claude/memory-grid/`.
+MemGrid auto-detects your project's languages and scans all relevant source files.
+
+**Supported languages:** TypeScript, JavaScript, Python, Go, Rust, and any Markdown documentation.
+
+```bash
+# Example output for a TypeScript + Markdown + Rules project:
+# 🔍 Scanning project (typescript, markdown, rules, config)...
+```
+
+The grid is stored in `.claude/memory-grid/`.
 
 ### Search
 
@@ -196,6 +205,32 @@ Memory units are stored as JSON in `.claude/memory-grid/units/` — **Git-friend
 ```
 
 `mesh.json` stores the grid metadata including `fileSnapshot` for incremental sync and `edgeIndex` for fast association traversal.
+
+## 🌐 Language Support
+
+MemGrid is **language-agnostic** at its core. Scanners are swappable plugins:
+
+| Scanner | Detects | Extracts |
+|---------|---------|----------|
+| **TypeScript** | `tsconfig.json`, `.ts` files | Classes, methods, exported functions (AST via ts-morph) |
+| **JavaScript** | `package.json` (no tsconfig), `.js` files | Exported functions, classes, arrow functions (regex) |
+| **Python** | `pyproject.toml`, `.py` files | Functions, classes, decorators, docstrings (regex) |
+| **Go** | `go.mod`, `.go` files | Functions, methods, structs, interfaces (regex) |
+| **Rust** | `Cargo.toml`, `.rs` files | Functions, structs, enums, traits, impl blocks (regex) |
+| **Markdown** | Any `.md` files | Headings as knowledge units |
+| **Rules** | `.claude/rules/*.md` | Design patterns, coding rules, trigger units |
+| **Config** | `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `docker-compose.yml` | Tech stack, dependencies, infrastructure |
+
+**Adding a new language** means implementing the `Scanner` interface — the core engine (storage, retrieval, learning, sync) stays untouched.
+
+```typescript
+// src/scanner/python.ts (example)
+export class PythonScanner implements Scanner {
+  readonly name = 'python';
+  detect(projectRoot: string): boolean { ... }
+  async scan(options: ScanOptions): Promise<MemoryUnit[]> { ... }
+}
+```
 
 ## 🔌 Integration
 

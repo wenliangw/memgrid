@@ -3,7 +3,13 @@ import * as crypto from 'crypto';
 import * as path from 'path';
 import type { MemoryUnit, ScanOptions, SearchOptions, SearchResult, SyncOptions, SyncResult, FileSnapshot } from './shared/types.js';
 import { FileStore } from './store/file-store.js';
-import { TypeScriptScanner, type Scanner } from './scanner/index.js';
+import {
+  TypeScriptScanner,
+  RulesScanner,
+  ConfigScanner,
+  MarkdownScanner,
+  type Scanner,
+} from './scanner/index.js';
 import { RetrieveEngine } from './retrieve/index.js';
 import { SemanticRetriever, type EmbeddingProvider, KeywordEmbeddingProvider } from './retrieve/semantic.js';
 import { LearnEngine, type TaskResult, type LearningSuggestions } from './learn/index.js';
@@ -32,7 +38,29 @@ export class MemGrid {
   async init(options: ScanOptions): Promise<MemoryUnit[]> {
     // Load existing cache first (if any)
     this.store.load();
+
+    // Run language scanner
     const units = await this.scanner.scan(options);
+
+    // Run universal scanners (rules, config, markdown) in parallel
+    const universalScans: Promise<MemoryUnit[]>[] = [];
+    if (options.includeRules) {
+      const rulesScanner = new RulesScanner(this.projectRoot);
+      if (rulesScanner.detect(this.projectRoot)) universalScans.push(rulesScanner.scan(options));
+    }
+    universalScans.push(new ConfigScanner(this.projectRoot).scan(options));
+    const mdScanner = new MarkdownScanner(this.projectRoot);
+    if (mdScanner.detect(this.projectRoot)) universalScans.push(mdScanner.scan(options));
+
+    const universalResults = await Promise.all(universalScans);
+    for (const result of universalResults) {
+      // Save universal scanner units (language scanner saves its own)
+      for (const unit of result) {
+        this.store.saveUnit(unit);
+        units.push(unit);
+      }
+    }
+
     // Build semantic index after scan
     await this.semantic.buildIndex();
     // Record file snapshot for future incremental syncs
@@ -47,32 +75,41 @@ export class MemGrid {
   private saveFileSnapshot(options: ScanOptions): void {
     const snapshot: FileSnapshot = {};
 
+    const sourceExts = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.go', '.rs', '.md']);
+    const testPatterns = ['.spec.', '.test.', '_test.'];
+
     const collectHashes = (dir: string) => {
       if (!fs.existsSync(dir)) return;
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const abs = path.join(dir, entry.name);
         const rel = path.relative(this.projectRoot, abs);
         if (entry.isDirectory()) {
-          if (entry.name !== 'node_modules' && entry.name !== 'dist' && entry.name !== '.next' && !entry.name.startsWith('.')) {
+          const skipDirs = new Set(['node_modules', 'dist', '.next', 'vendor', 'target', '__pycache__']);
+          if (!skipDirs.has(entry.name) && !entry.name.startsWith('.')) {
             collectHashes(abs);
           }
-        } else if (
-          entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts') && !entry.name.endsWith('.test.ts')
-        ) {
-          snapshot[rel] = crypto.createHash('sha256').update(fs.readFileSync(abs, 'utf-8')).digest('hex');
+        } else {
+          const ext = path.extname(entry.name);
+          if (sourceExts.has(ext)) {
+            // Skip test files
+            if (testPatterns.some((p) => entry.name.includes(p))) continue;
+            snapshot[rel] = crypto.createHash('sha256').update(fs.readFileSync(abs, 'utf-8')).digest('hex');
+          }
         }
       }
     };
 
     // Scan source dirs
-    ['apps', 'packages', 'src'].forEach((d) => collectHashes(path.join(this.projectRoot, d)));
+    ['apps', 'packages', 'src', 'lib', 'cmd', 'internal', 'pkg', 'app'].forEach(
+      (d) => collectHashes(path.join(this.projectRoot, d)),
+    );
 
     // Rules and examples
     if (options.includeRules) collectHashes(path.join(this.projectRoot, '.claude', 'rules'));
     if (options.includeExamples) collectHashes(path.join(this.projectRoot, '.claude', 'examples'));
 
     // Config files
-    for (const f of ['package.json', 'docker-compose.yml']) {
+    for (const f of ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'docker-compose.yml']) {
       const abs = path.join(this.projectRoot, f);
       if (fs.existsSync(abs)) {
         snapshot[f] = crypto.createHash('sha256').update(fs.readFileSync(abs, 'utf-8')).digest('hex');

@@ -1,3 +1,10 @@
 export type { Scanner } from './scanner.js';
 export { CompositeScanner } from './composite.js';
 export { TypeScriptScanner } from './typescript.js';
+export { JavaScriptScanner } from './javascript.js';
+export { PythonScanner } from './python.js';
+export { GoScanner } from './golang.js';
+export { RustScanner } from './rust.js';
+export { MarkdownScanner } from './markdown.js';
+export { RulesScanner } from './rules.js';
+export { ConfigScanner } from './config.js';

@@ -2,9 +2,21 @@
 
 All notable changes to MemGrid.
 
-## v0.5.0 — Incremental Sync Engine (2026-06-28)
+## v0.5.0 — Multi-Language + Incremental Sync (2026-06-28)
 
-### Added
+### Added — Language-Agnostic Scanner Architecture
+- `Scanner` interface: `name`, `scan()`, `scanFiles?()`, `detect()`
+- `CompositeScanner`: auto-detects and composes multiple language scanners
+- **TypeScript** — `ts-morph` AST (classes, methods, exported functions, call graph associations)
+- **JavaScript** — regex (exported functions, classes, arrow functions)
+- **Python** — regex (functions, classes, decorators, docstrings)
+- **Go** — regex (functions, methods, structs, interfaces)
+- **Rust** — regex (functions, structs, enums, traits, impl blocks)
+- **Markdown** — headings as knowledge units from any `.md` file
+- **Rules** — `.claude/rules/*.md` → pattern + trigger units (universal, extracted from TS scanner)
+- **Config** — `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `docker-compose.yml` (universal)
+
+### Added — Incremental Sync
 - `memgrid sync` CLI command for incremental re-scan after code changes
 - `mg.sync()` API: hash-based file diff against baseline snapshot
 - File snapshots stored in `mesh.json.fileSnapshot` (SHA-256 per scanned file)

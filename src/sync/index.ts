@@ -100,6 +100,11 @@ export class SyncEngine {
     const oldSnapshot = grid?.fileSnapshot ?? {};
 
     // === Phase 1: Detect diffs ===
+    const sourceExts = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.go', '.rs', '.md']);
+    const testPatterns = ['.spec.', '.test.', '_test.'];
+    const skipDirs = new Set(['node_modules', 'dist', '.next', 'vendor', 'target', '__pycache__']);
+    const configFiles = ['package.json', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'docker-compose.yml'];
+
     const collectFiles = (): string[] => {
       const files: string[] = [];
       const collect = (dir: string) => {
@@ -107,47 +112,32 @@ export class SyncEngine {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
           const rel = path.relative(this.projectRoot, path.join(dir, entry.name));
           if (entry.isDirectory()) {
-            if (entry.name !== 'node_modules' && entry.name !== 'dist' && entry.name !== '.next' && !entry.name.startsWith('.')) {
+            if (!skipDirs.has(entry.name) && !entry.name.startsWith('.')) {
               collect(path.join(dir, entry.name));
             }
-          } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts') && !entry.name.endsWith('.test.ts')) {
-            files.push(rel);
-          } else if (entry.name.endsWith('.md') && rel.startsWith('.claude/rules/')) {
-            files.push(rel);
-          } else if (entry.name.endsWith('.ts') && rel.startsWith('.claude/examples/')) {
-            files.push(rel);
-          } else if (entry.name === 'package.json' || entry.name === 'docker-compose.yml') {
-            files.push(rel);
+          } else {
+            const ext = path.extname(entry.name);
+            if (sourceExts.has(ext)) {
+              if (!testPatterns.some((p) => entry.name.includes(p))) {
+                files.push(rel);
+              }
+            } else if (configFiles.includes(entry.name)) {
+              files.push(rel);
+            }
           }
         }
       };
 
       // Scan source dirs
-      const appsDir = path.join(this.projectRoot, 'apps');
-      const packagesDir = path.join(this.projectRoot, 'packages');
-      const srcDir = path.join(this.projectRoot, 'src');
-
-      if (fs.existsSync(appsDir)) collect(appsDir);
-      if (fs.existsSync(packagesDir)) collect(packagesDir);
-      if (fs.existsSync(srcDir)) collect(srcDir);
+      ['apps', 'packages', 'src', 'lib', 'cmd', 'internal', 'pkg', 'app'].forEach(
+        (d) => collect(path.join(this.projectRoot, d)),
+      );
 
       // Rules
-      if (options.includeRules) {
-        const rulesDir = path.join(this.projectRoot, '.claude', 'rules');
-        if (fs.existsSync(rulesDir)) collect(rulesDir);
-      }
+      if (options.includeRules) collect(path.join(this.projectRoot, '.claude', 'rules'));
 
       // Examples
-      if (options.includeExamples) {
-        const examplesDir = path.join(this.projectRoot, '.claude', 'examples');
-        if (fs.existsSync(examplesDir)) collect(examplesDir);
-      }
-
-      // Config roots
-      for (const configFile of ['package.json', 'docker-compose.yml']) {
-        const p = path.join(this.projectRoot, configFile);
-        if (fs.existsSync(p)) files.push(configFile);
-      }
+      if (options.includeExamples) collect(path.join(this.projectRoot, '.claude', 'examples'));
 
       return files;
     };
@@ -367,6 +357,12 @@ export class SyncEngine {
             });
           }
         }
+      }
+
+      if (file.endsWith('.py') || file.endsWith('.js') || file.endsWith('.go') || file.endsWith('.rs')) {
+        // Non-TS language files: only tracked via hash snapshot, full re-scan on next init.
+        // Incremental AST parsing for these languages requires language-specific parsers.
+        continue;
       }
 
       if (file.endsWith('.md') && file.startsWith('.claude/rules/')) {
