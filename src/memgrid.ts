@@ -166,6 +166,7 @@ export class MemGrid {
   }
 
   async search(query: string, options?: SearchOptions): Promise<SearchResult> {
+    this.store.load();
     const result = await this.semantic.search(query, options);
     // Touch usage counts for retrieved units (in-memory, periodically flushed)
     for (const unit of result.units) {
@@ -236,10 +237,12 @@ export class MemGrid {
    * Much faster than full init() when only a few files changed.
    */
   async sync(options: SyncOptions): Promise<SyncResult> {
+    this.store.load();
     return this.syncEngine.sync(options);
   }
 
   async stats() {
+    this.store.load();
     const cached = this.store.getStats();
     const grid = this.store.getGrid();
 
