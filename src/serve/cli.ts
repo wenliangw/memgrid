@@ -13,6 +13,7 @@ import {
 } from '../scanner/index.js';
 import { startMCPServer } from './mcp-server.js';
 import { injectHooks } from '../hooks.js';
+import { parseMemoryInput, createMemoryUnit } from '../learn/nlp.js';
 
 const program = new Command();
 
@@ -175,6 +176,26 @@ program
     });
 
     console.log(`✅ Added: ${unit.id}`);
+  });
+
+program
+  .command('learn')
+  .description('Learn from a natural language description — auto-creates memory units')
+  .argument('<input...>', 'Free-form description of what you learned (error, decision, pattern)')
+  .option('-f, --file <file>', 'Source file path (optional)')
+  .action(async (input, options) => {
+    const text = input.join(' ');
+    const parsed = parseMemoryInput(text, options.file);
+    const unit = createMemoryUnit(parsed, options.file);
+
+    const mg = new MemGrid(process.cwd());
+    await mg.add(unit);
+
+    console.log(`🧠 Learned: [${parsed.type}] ${parsed.summary.slice(0, 60)}`);
+    console.log(`   id: ${unit.id}`);
+    if (parsed.content.trigger) console.log(`   trigger: ${parsed.content.trigger}`);
+    if (parsed.content.action) console.log(`   action: ${parsed.content.action}`);
+    console.log(`   confidence: ${parsed.confidence}`);
   });
 
 program
