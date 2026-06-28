@@ -29,49 +29,10 @@ export class RulesScanner implements Scanner {
       if (!file.endsWith('.md')) continue;
 
       const filePath = path.join(rulesDir, file);
-      const content = fs.readFileSync(filePath, 'utf-8');
       const relativePath = path.relative(this.projectRoot, filePath);
 
-      // Extract sections from markdown
-      const sections = content.split(/^## /m).filter(Boolean);
-      for (const section of sections) {
-        const title = section.split('\n')[0].trim();
-        const body = section.split('\n').slice(1).join('\n').trim();
-        if (!title || body.length < 50) continue;
-
-        const safeTitle = title
-          .replace(/[^a-zA-Z0-9_-]/g, '_')
-          .replace(/_+/g, '_')
-          .slice(0, 50)
-          .toLowerCase();
-        if (!safeTitle || safeTitle === '_') continue;
-
-        const safeFile = file
-          .replace('.md', '')
-          .replace(/[^a-zA-Z0-9_-]/g, '_')
-          .replace(/_+/g, '_')
-          .slice(0, 30)
-          .toLowerCase();
-
-        units.push({
-          id: `rule_${safeFile}_${safeTitle}`,
-          type: 'pattern',
-          summary: `${file.replace('.md', '')}: ${title}`,
-          source: { file: relativePath },
-          signatures: [title, file.replace('.md', '').replace(/-/g, ' ')],
-          content: { description: body.slice(0, 500) },
-          associations: [],
-          meta: {
-            created: new Date().toISOString(),
-            updated: new Date().toISOString(),
-            confidence: 0.9,
-            usage_count: 0,
-            status: 'active',
-          },
-        });
-      }
-
-      // Also create a rule_trigger unit
+      // Only create a rule_trigger unit — Claude can read the original file
+      // when the trigger fires, so storing pattern units is redundant.
       const safeFile = file
         .replace('.md', '')
         .replace(/[^a-zA-Z0-9_-]/g, '_')
