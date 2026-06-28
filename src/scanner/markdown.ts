@@ -112,6 +112,14 @@ export class MarkdownScanner implements Scanner {
             continue;
           walk(abs);
         } else if (entry.name.endsWith('.md') && !entry.name.startsWith('.')) {
+          const skipFiles = new Set([
+            'README.md',
+            'CHANGELOG.md',
+            'CONTRIBUTING.md',
+            'LICENSE.md',
+            'CODE_OF_CONDUCT.md',
+          ]);
+          if (skipFiles.has(entry.name)) continue;
           files.push(rel);
         }
       }
