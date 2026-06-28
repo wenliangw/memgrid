@@ -25,35 +25,28 @@ jobs:
 
       - run: pnpm build
 
-      - name: Check bundle size
+      - name: Bundle size
         run: |
-          echo "=== Dist Size ==="
+          echo "### Dist Size"
           du -sh dist/
-          echo "=== Top 10 largest files ==="
+          echo ""
+          echo "### Largest Files"
           find dist -name "*.js" -exec du -h {} \; | sort -rh | head -10
 
-      - name: Check test count
+      - name: Test count
         run: |
-          echo "=== Test Files ==="
-          ls tests/*.test.ts
-          echo "=== Test Count ==="
-          npx vitest run --reporter=json 2>/dev/null | node -e "
-            const chunks = [];
-            process.stdin.on('data', c => chunks.push(c));
-            process.stdin.on('end', () => {
-              try {
-                const data = JSON.parse(Buffer.concat(chunks).toString());
-                console.log('Tests passed:', data.numPassedTests || 'N/A');
-              } catch {
-                // fallback below
-              }
-            });
-          " 2>/dev/null || true
+          echo "### Test Files"
+          ls tests/*.test.ts | wc -l
           echo ""
-          echo "=== Quick perf check ==="
-          echo "Note: Full perf tests need a project fixture. Quick check passes."
+          npx vitest run --reporter=json 2>/dev/null > /tmp/vitest-output.json || true
+          node -e "
+            try {
+              const data = JSON.parse(require('fs').readFileSync('/tmp/vitest-output.json','utf-8'));
+              console.log('Tests:', data.numPassedTests || data.testResults?.reduce((s,r) => s + r.assertionResults.length, 0) || 'N/A');
+            } catch(e) { console.log('N/A'); }
+          "
 
-      - name: Check package.json size
+      - name: Performance benchmarks
         run: |
-          echo "=== npm pack size ==="
-          pnpm pack --dry-run 2>/dev/null | grep "package size\|total files" || echo "pack check unavailable"
+          echo "### Perf Benchmarks"
+          pnpm vitest run tests/perf.test.ts --reporter=verbose 2>&1 | grep -E "✓|PASS|FAIL|ms$"
