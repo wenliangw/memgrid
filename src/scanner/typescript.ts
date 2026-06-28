@@ -82,11 +82,12 @@ export class TypeScriptScanner implements Scanner {
     for (const sourceFile of project.getSourceFiles()) {
       const filePath = path.relative(this.projectRoot, sourceFile.getFilePath());
 
-      // Skip test files, node_modules, dist, .next
+      // Skip test files, node_modules, dist, .next, migrations
       if (
         filePath.includes('node_modules') ||
         filePath.includes('dist') ||
-        filePath.includes('.next')
+        filePath.includes('.next') ||
+        filePath.includes('migrations')
       )
         continue;
       if (filePath.endsWith('.spec.ts') || filePath.endsWith('.test.ts')) continue;
@@ -128,7 +129,9 @@ export class TypeScriptScanner implements Scanner {
               inputs: params.length > 0 ? params.join(', ') : 'none',
               outputs: returnType,
               dependencies: this.extractDependencies(method),
-              code_snippet: method.getText(), // Full text for association analysis
+              code_snippet: className.endsWith('Controller')
+                ? ''
+                : this.truncateLines(method.getText(), 15),
             },
             associations: [],
             meta: {
@@ -230,7 +233,7 @@ export class TypeScriptScanner implements Scanner {
           source: { file: relativePath },
           signatures: [title, file.replace('.md', '').replace(/-/g, ' ')],
           content: {
-            description: body.slice(0, 500),
+            description: body.slice(0, 200),
           },
           associations: [],
           meta: {
@@ -598,6 +601,11 @@ export class TypeScriptScanner implements Scanner {
     }
 
     return [...names];
+  }
+
+  private truncateLines(text: string, maxLines: number): string {
+    const lines = text.split('\n');
+    return lines.slice(0, maxLines).join('\n') + (lines.length > maxLines ? '\n// ...' : '');
   }
 
   private isCommonKeyword(name: string): boolean {

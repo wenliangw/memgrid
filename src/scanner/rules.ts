@@ -59,7 +59,7 @@ export class RulesScanner implements Scanner {
           summary: `${file.replace('.md', '')}: ${title}`,
           source: { file: relativePath },
           signatures: [title, file.replace('.md', '').replace(/-/g, ' ')],
-          content: { description: body.slice(0, 500) },
+          content: { description: body.slice(0, 200) },
           associations: [],
           meta: {
             created: new Date().toISOString(),

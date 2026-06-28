@@ -156,7 +156,8 @@ export class RetrieveEngine {
       const associationBonus = this.computeAssociationBonus(id, keywordUnitIds, edgeIndex);
       const usageBonus = Math.min(unit.meta.usage_count / 50, 0.2);
 
-      const score = keywordScore * 0.7 + associationBonus * 0.2 + usageBonus * 0.1;
+      let score = keywordScore * 0.7 + associationBonus * 0.2 + usageBonus * 0.1;
+      if (unit.type === 'pattern') score *= 0.5;
       matchedUnits.push({ unit, score });
     }
 
@@ -236,7 +237,7 @@ export class RetrieveEngine {
       }
       if (unit.content.code_snippet) {
         lines.push('```ts');
-        lines.push(unit.content.code_snippet.slice(0, 300));
+        lines.push(unit.content.code_snippet.slice(0, 200));
         lines.push('```');
       }
       lines.push('');
