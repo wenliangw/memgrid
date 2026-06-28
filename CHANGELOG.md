@@ -2,6 +2,17 @@
 
 All notable changes to MemGrid.
 
+## v0.5.2 — Auto-Sync Hooks (unreleased)
+
+### Added
+- `memgrid init` auto-configures memory sync hooks:
+  - **Claude Code PostCompletion** → runs `memgrid sync` after each task
+  - **Git post-commit** → runs `memgrid sync` after each commit
+  - All injections are non-destructive (merges with existing config)
+
+### Changed
+- README: added Auto-Sync Hooks section + CLAUDE.md integration template
+
 ## v0.5.1 — Search Bug Fix (2026-06-28)
 
 ### Fixed
