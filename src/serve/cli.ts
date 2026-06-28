@@ -110,6 +110,25 @@ program
     console.log(`⚠️  Stale units:    ${result.staleUnits}`);
     console.log(`🔗 Repaired links: ${result.repairedAssociations}`);
     console.log(`💔 Broken links:   ${result.brokenAssociations}`);
+    if (result.newAssociations > 0) {
+      console.log(`🆕 New associations: ${result.newAssociations}`);
+    }
+    if (result.detectedPatterns.length > 0) {
+      console.log(`\n🧠 Patterns detected:`);
+      for (const p of result.detectedPatterns) {
+        console.log(
+          `  ${p.type === 'error_solution' ? '🐛' : p.type === 'pattern' ? '📐' : '📋'} ${p.summary} (${p.file})`,
+        );
+      }
+    }
+    if (result.alerts.length > 0) {
+      console.log(`\n⚠️  Alerts:`);
+      for (const a of result.alerts) {
+        const icon = a.level === 'error' ? '🚫' : '⚠️';
+        console.log(`  ${icon} ${a.message}`);
+        console.log(`     → ${a.file}`);
+      }
+    }
     console.log(`\n⏱️  Done in ${result.elapsedMs}ms`);
   });
 

@@ -91,8 +91,31 @@ export interface SyncResult {
   repairedAssociations: number;
   /** Broken associations that couldn't be repaired */
   brokenAssociations: number;
+  /** New associations discovered from code analysis */
+  newAssociations: number;
+  /** Patterns detected in recent changes */
+  detectedPatterns: SyncPattern[];
+  /** Architecture alerts triggered by changes */
+  alerts: SyncAlert[];
   /** Total time in ms */
   elapsedMs: number;
+}
+
+/** A pattern detected during sync (new error handling, design pattern, etc.) */
+export interface SyncPattern {
+  type: 'error_solution' | 'pattern' | 'decision';
+  summary: string;
+  file: string;
+  confidence: number;
+}
+
+/** An architecture alert triggered by a code change */
+export interface SyncAlert {
+  level: 'warning' | 'error';
+  message: string;
+  file: string;
+  /** Which principle unit triggered this alert */
+  principle?: string;
 }
 
 /** Options for sync */

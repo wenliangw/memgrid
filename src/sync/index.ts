@@ -11,6 +11,9 @@ import type {
 } from '../shared/types.js';
 import type { FileStore } from '../store/file-store.js';
 import type { Scanner } from '../scanner/scanner.js';
+import { analyzeAssociations } from './phases/associations.js';
+import { detectPatterns } from './phases/patterns.js';
+import { checkArchitecture } from './phases/architecture.js';
 
 // ===== File hash utilities =====
 
@@ -188,6 +191,9 @@ export class SyncEngine {
         staleUnits: 0,
         repairedAssociations: 0,
         brokenAssociations: 0,
+        newAssociations: 0,
+        detectedPatterns: [],
+        alerts: [],
         elapsedMs: Date.now() - t0,
       };
     }
@@ -266,6 +272,17 @@ export class SyncEngine {
     const allActiveUnits = await this.store.listUnits({ includeArchived: false });
     this.updateGrid(allActiveUnits, newSnapshot);
 
+    // === Phase 6: Rebuild associations from changed code ===
+    const unitMap = new Map<string, MemoryUnit>();
+    for (const u of allActiveUnits) unitMap.set(u.id, u);
+    const { newAssociations } = analyzeAssociations(this.projectRoot, changedFiles, unitMap);
+
+    // === Phase 7: Detect semantic patterns ===
+    const { patterns } = detectPatterns(this.projectRoot, changedFiles);
+
+    // === Phase 8: Architecture consistency checks ===
+    const { alerts } = checkArchitecture(this.projectRoot, changedFiles, unitMap);
+
     return {
       changedFiles,
       removedFiles,
@@ -273,6 +290,9 @@ export class SyncEngine {
       staleUnits,
       repairedAssociations: repaired,
       brokenAssociations: broken,
+      newAssociations,
+      detectedPatterns: patterns,
+      alerts,
       elapsedMs: Date.now() - t0,
     };
   }
