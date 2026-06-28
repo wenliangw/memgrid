@@ -75,9 +75,11 @@ function injectClaudeHook(projectRoot: string): 'created' | 'merged' | 'already_
       const existing = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')) as SettingsJson;
 
       // Already has PostCompletion with memgrid sync?
-      if (existing.hooks?.PostCompletion?.some((h) =>
-        h.hooks.some((hook) => hook.command.includes('memgrid sync')),
-      )) {
+      if (
+        existing.hooks?.PostCompletion?.some((h) =>
+          h.hooks.some((hook) => hook.command.includes('memgrid sync')),
+        )
+      ) {
         return 'already_exists';
       }
 
@@ -145,7 +147,13 @@ function injectGitHook(projectRoot: string): 'created' | 'already_exists' | 'not
       return 'already_exists';
     }
     try {
-      const hookContent = ['#!/usr/bin/env sh', '', '# MemGrid: auto-sync memory grid after commit', 'npx memgrid sync --quiet 2>/dev/null || true', ''].join('\n');
+      const hookContent = [
+        '#!/usr/bin/env sh',
+        '',
+        '# MemGrid: auto-sync memory grid after commit',
+        'npx memgrid sync --quiet 2>/dev/null || true',
+        '',
+      ].join('\n');
 
       fs.writeFileSync(huskyHookPath, hookContent, { mode: 0o755 });
       return 'created';
@@ -163,7 +171,13 @@ function injectGitHook(projectRoot: string): 'created' | 'already_exists' | 'not
   }
 
   try {
-    const hookContent = ['#!/bin/sh', '', '# MemGrid: auto-sync memory grid after commit', 'npx memgrid sync --quiet 2>/dev/null || true', ''].join('\n');
+    const hookContent = [
+      '#!/bin/sh',
+      '',
+      '# MemGrid: auto-sync memory grid after commit',
+      'npx memgrid sync --quiet 2>/dev/null || true',
+      '',
+    ].join('\n');
 
     fs.writeFileSync(gitHookPath, hookContent, { mode: 0o755 });
     return 'created';
