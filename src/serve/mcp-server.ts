@@ -236,78 +236,18 @@ export class MemGridServer {
 
           case 'memgrid_suggest': {
             const { taskSummary, outcome, filesModified } = args as any;
-
-            // Search for existing units related to this task
-            const result = await this.mg.search(taskSummary, { maxResults: 5, maxHops: 1 });
-
-            const suggestions: string[] = [];
-            suggestions.push(`## 📋 MemGrid Suggestions for: "${taskSummary}"\n`);
-
-            // Suggest new method units for modified files
-            if (filesModified && filesModified.length > 0) {
-              const existingFiles = new Set(
-                result.units.filter((u) => u.source?.file).map((u) => u.source!.file),
-              );
-              const newFiles = filesModified.filter((f: string) => !existingFiles.has(f));
-
-              if (newFiles.length > 0) {
-                suggestions.push(
-                  `### 💡 Suggested new method units (${newFiles.length} new files):`,
-                );
-                for (const file of newFiles) {
-                  suggestions.push(`- Scan \`${file}\` with \`memgrid_init\` to extract methods`);
-                }
-                suggestions.push('');
-              }
-            }
-
-            // Suggest updates for existing relevant units
-            if (result.units.length > 0) {
-              suggestions.push(`### 🔄 Related existing units (${result.units.length} found):`);
-              for (const unit of result.units.slice(0, 5)) {
-                suggestions.push(`- \`${unit.id}\` — ${unit.summary}`);
-              }
-              suggestions.push('\nReview and update if the task changed their behavior.');
-            }
-
-            // Suggest error_solution if outcome mentions fixes
-            const fixKeywords = ['fix', 'bug', 'error', 'OOM', 'crash', '修复', '错误'];
-            if (
-              fixKeywords.some(
-                (k) => taskSummary.toLowerCase().includes(k) || outcome.toLowerCase().includes(k),
-              )
-            ) {
-              suggestions.push('### 🐛 Suggested error_solution unit:');
-              suggestions.push(`- Record this fix: what was the error, and what was the solution?`);
-              suggestions.push(`- Use \`memgrid_add --type error_solution\` to add it.`);
-              suggestions.push('');
-            }
-
-            // Suggest decision unit if the task seems architectural
-            const decisionKeywords = [
-              'refactor',
-              'architecture',
-              'pattern',
-              'design',
-              '重构',
-              '架构',
-            ];
-            if (decisionKeywords.some((k) => taskSummary.includes(k))) {
-              suggestions.push('### 🎯 Suggested decision unit:');
-              suggestions.push('- Record why this architectural decision was made.');
-              suggestions.push('- Use `memgrid_add --type decision` to capture the rationale.');
-              suggestions.push('');
-            }
-
-            if (suggestions.length <= 2) {
-              suggestions.push(
-                'No strong suggestions. The grid may not need updates for this task.',
-              );
-            }
-
-            return {
-              content: [{ type: 'text', text: suggestions.join('\n') }],
-            };
+            const suggestions = await this.mg.analyzeTask({
+              summary: taskSummary,
+              outcome: outcome,
+              filesModified: filesModified || [],
+            });
+            const applied = await this.mg.applySuggestions(suggestions);
+            const text =
+              this.mg.formatSuggestions(suggestions) +
+              '\n### ✅ Auto-applied\n' +
+              applied.map((a: string) => '  ' + a).join('\n') +
+              '\n\nRun memgrid sync to persist these changes.';
+            return { content: [{ type: 'text', text }] };
           }
 
           default:

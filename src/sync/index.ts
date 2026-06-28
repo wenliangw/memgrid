@@ -14,6 +14,7 @@ import type { Scanner } from '../scanner/scanner.js';
 import { analyzeAssociations } from './phases/associations.js';
 import { detectPatterns } from './phases/patterns.js';
 import { checkArchitecture } from './phases/architecture.js';
+import { generateLearnings } from './phases/learning.js';
 
 // ===== File hash utilities =====
 
@@ -194,6 +195,7 @@ export class SyncEngine {
         newAssociations: 0,
         detectedPatterns: [],
         alerts: [],
+        autoLearnedUnits: 0,
         elapsedMs: Date.now() - t0,
       };
     }
@@ -283,6 +285,9 @@ export class SyncEngine {
     // === Phase 8: Architecture consistency checks ===
     const { alerts } = checkArchitecture(this.projectRoot, changedFiles, unitMap);
 
+    // === Phase 9: Learning engine — auto-create units from patterns/alerts ===
+    const { autoUnitsCreated } = generateLearnings(this.store, changedFiles, patterns, alerts);
+
     return {
       changedFiles,
       removedFiles,
@@ -293,6 +298,7 @@ export class SyncEngine {
       newAssociations,
       detectedPatterns: patterns,
       alerts,
+      autoLearnedUnits: autoUnitsCreated,
       elapsedMs: Date.now() - t0,
     };
   }

@@ -97,6 +97,8 @@ export interface SyncResult {
   detectedPatterns: SyncPattern[];
   /** Architecture alerts triggered by changes */
   alerts: SyncAlert[];
+  /** Auto-created memory units from learning engine */
+  autoLearnedUnits: number;
   /** Total time in ms */
   elapsedMs: number;
 }
