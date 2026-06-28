@@ -3,14 +3,23 @@ import * as fs from 'fs';
 import { Project, SyntaxKind } from 'ts-morph';
 import type { MemoryUnit, MemoryGrid, Association, ScanOptions } from '../shared/types.js';
 import type { FileStore } from '../store/file-store.js';
+import type { Scanner } from './scanner.js';
 
-export class TypeScriptScanner {
+export class TypeScriptScanner implements Scanner {
+  readonly name = 'typescript';
   private store: FileStore;
   private projectRoot: string;
 
   constructor(store: FileStore, projectRoot: string) {
     this.store = store;
     this.projectRoot = projectRoot;
+  }
+
+  detect(projectRoot: string): boolean {
+    return (
+      fs.existsSync(path.join(projectRoot, 'tsconfig.json')) ||
+      this.findSourceDirs().length > 0
+    );
   }
 
   async scan(options: ScanOptions): Promise<MemoryUnit[]> {

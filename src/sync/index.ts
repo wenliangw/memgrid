@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { MemoryUnit, MemoryGrid, FileSnapshot, SyncResult, SyncOptions, Association } from '../shared/types.js';
 import type { FileStore } from '../store/file-store.js';
-import type { TypeScriptScanner } from '../scanner/typescript.js';
+import type { Scanner } from '../scanner/scanner.js';
 
 // ===== File hash utilities =====
 
@@ -69,10 +69,10 @@ function diceSimilarity(a: string, b: string): number {
 
 export class SyncEngine {
   private store: FileStore;
-  private scanner: TypeScriptScanner;
+  private scanner: Scanner;
   private projectRoot: string;
 
-  constructor(store: FileStore, scanner: TypeScriptScanner, projectRoot: string) {
+  constructor(store: FileStore, scanner: Scanner, projectRoot: string) {
     this.store = store;
     this.scanner = scanner;
     this.projectRoot = projectRoot;

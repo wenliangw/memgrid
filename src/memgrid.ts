@@ -1,9 +1,9 @@
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import * as path from 'path';
-import type { MemoryUnit, ScanOptions, SearchOptions, SearchResult, SyncOptions, SyncResult, FileSnapshot, MemoryGrid } from './shared/types.js';
+import type { MemoryUnit, ScanOptions, SearchOptions, SearchResult, SyncOptions, SyncResult, FileSnapshot } from './shared/types.js';
 import { FileStore } from './store/file-store.js';
-import { TypeScriptScanner } from './scanner/typescript.js';
+import { TypeScriptScanner, type Scanner } from './scanner/index.js';
 import { RetrieveEngine } from './retrieve/index.js';
 import { SemanticRetriever, type EmbeddingProvider, KeywordEmbeddingProvider } from './retrieve/semantic.js';
 import { LearnEngine, type TaskResult, type LearningSuggestions } from './learn/index.js';
@@ -11,17 +11,18 @@ import { SyncEngine } from './sync/index.js';
 
 export class MemGrid {
   store: FileStore;
-  scanner: TypeScriptScanner;
+  scanner: Scanner;
   retrieve: RetrieveEngine;
   semantic: SemanticRetriever;
   learn: LearnEngine;
   syncEngine: SyncEngine;
   projectRoot: string;
 
-  constructor(projectRoot: string, provider?: EmbeddingProvider) {
+  constructor(projectRoot: string, provider?: EmbeddingProvider, scanner?: Scanner) {
     this.projectRoot = projectRoot;
     this.store = new FileStore(projectRoot);
-    this.scanner = new TypeScriptScanner(this.store, projectRoot);
+    // Accept optional scanner injection, default to TypeScript
+    this.scanner = scanner ?? new TypeScriptScanner(this.store, projectRoot);
     this.retrieve = new RetrieveEngine(this.store);
     this.semantic = new SemanticRetriever(this.store, provider || new KeywordEmbeddingProvider());
     this.learn = new LearnEngine(this.store);

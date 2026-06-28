@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { MemGrid } from '../memgrid.js';
+import { TypeScriptScanner } from '../scanner/index.js';
 import { startMCPServer } from './mcp-server.js';
 
 const program = new Command();
@@ -17,8 +18,14 @@ program
   .option('--no-rules', 'Skip scanning .claude/rules/')
   .option('--no-examples', 'Skip scanning .claude/examples/')
   .action(async (options) => {
-    const mg = new MemGrid(process.cwd());
-    console.log('🔍 Scanning project...\n');
+    // Auto-detect applicable scanners (only uses detect(), no store needed)
+    const root = process.cwd();
+    const probe = new TypeScriptScanner(null as any, root);
+    const detected = probe.detect(root) ? ['typescript'] : [];
+
+    // MemGrid constructor will create full scanner with proper store
+    const mg = new MemGrid(root);
+    console.log(`🔍 Scanning project (${detected.join(', ') || 'typescript'})...\n`);
 
     const units = await mg.init({
       projectRoot: process.cwd(),
