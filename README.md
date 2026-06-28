@@ -92,8 +92,6 @@ memgrid sync
 # ⏱️  Done in 1834ms
 ```
 
-Optimized for CI/CD: 0 changes → instant fast path (~5ms), 1 file change → ~2s, full 150-unit project init → ~10s.
-
 ### Add Custom Units
 
 ```bash
@@ -139,56 +137,6 @@ Exposes MemGrid as an MCP tool — plug into Claude Desktop, VS Code, or any MCP
 | `style_preference` | Your coding style | "functional pipes over for-loops" |
 | `architecture_principle` | Architecture red lines | "Controller never calls Repository directly" |
 
-## 📊 Features
-
-### v0.5 (current) — Incremental Sync
-
-- **Hash-based diff**: SHA-256 file snapshots in `mesh.json` — detects changed files in ~5ms
-- **Partial re-scan**: Only re-parses changed TypeScript/markdown files
-- **Fuzzy match repair**: Jaccard + Dice similarity repairs broken associations after code changes
-- **Stale detection**: Marks orphaned units when files are deleted
-- **LRU cache**: Repeated queries return in 0ms
-- **JSON storage**: 3-5x faster disk I/O vs YAML
-
-### v0.4 — Hybrid Semantic Search
-
-- Combines MiniSearch (keyword) with embedding similarity
-- Configurable `semanticWeight` (0.0 = pure keyword, 1.0 = pure semantic)
-- Keyword embedding provider built-in (no external API required)
-
-### v0.3 — Auto-Learning Engine
-
-- Post-task analysis: detects new methods, patterns, errors, decisions
-- `mg.analyzeTask()` + `mg.applySuggestions()` API
-- Suggestions formatted as human-readable diff
-
-### v0.2 — MCP Server
-
-- Full MCP (Model Context Protocol) server implementation
-- `memgrid_search` and `memgrid_context` tools exposed
-- Plugs into Claude Desktop, VS Code, Cursor, etc.
-
-### v0.1 — Core Engine
-
-- TypeScript AST scanning with `ts-morph`
-- Rule/example/config multi-source extraction
-- Association graph building (call graph, pattern matching)
-- CLI: `init`, `search`, `add`, `stats`
-
-## 🔄 Self-Evolution
-
-MemGrid isn't static — it learns after every task:
-
-```
-Task Complete
-  → What did we build?      → Add method/component units
-  → What mistakes were made? → Add error_solution units
-  → What decisions matter?   → Add decision units
-  → What tools worked well?  → Update trigger units
-  → What style emerged?     → Update preference units
-  → Grid density +1
-```
-
 ## 🆚 vs Alternatives
 
 | | Claude Auto Memory | Mem0 | Cursor Indexing | **MemGrid** |
@@ -203,13 +151,13 @@ Task Complete
 
 ## 📊 Performance
 
-| Scenario | Time | Improvement |
-|----------|------|-------------|
-| 10 searches | 3ms | 223x vs v0.3 |
-| Repeated query | 0ms | LRU cache |
-| Disk reload | 5ms | 9x vs YAML |
-| Sync (0 changes) | 5ms | Hash fast path |
-| Sync (1 file) | ~2s | vs full init ~10s |
+| Scenario | Time |
+|----------|------|
+| Search (keyword) | < 3ms |
+| Search (repeated, LRU) | 0ms |
+| Sync (0 changes) | ~5ms |
+| Sync (1 file changed) | ~2s |
+| Full init (150 units) | ~10s |
 
 ## 📁 File Format
 
