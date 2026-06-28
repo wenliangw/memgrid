@@ -270,8 +270,6 @@ memgrid serve
 - [x] v0.3 — Auto-learning engine (post-task grid evolution)
 - [x] v0.4 — Hybrid semantic search
 - [x] v0.5 — Incremental sync engine (hash diff + fuzzy repair)
-- [ ] v0.6 — Cloud storage + RemoteStore (Septonir-backed server)
-- [ ] v0.7 — AI Community: shared grids, cross-agent learning, diversity engine
 - [ ] v1.0 — Web dashboard + CI/CD integration
 
 ## License
