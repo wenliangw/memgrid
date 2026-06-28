@@ -2,6 +2,21 @@
 
 All notable changes to MemGrid.
 
+## v0.6.0 — Cognitive Sync Pipeline + Learning Engine (2026-06-28)
+
+### Added
+- **Phase 6: Learning engine** — sync auto-creates memory units from detected patterns
+  - Patterns → error_solution/pattern/decision units (confidence-gated)
+  - Alerts → error_solution units for architecture violations
+  - Changed files → +0.05 confidence boost to existing units
+- **memgrid_suggest MCP tool** — now calls LearnEngine.analyze + applySuggestions
+  - Auto-applies high-confidence suggestions
+  - Returns formatted suggestions + applied list
+
+### Changed
+- Sync CLI output: shows auto-learned unit count
+- SyncResult: new  field
+
 ## v0.5.4 — Duplicate Rule Fix (2026-06-28)
 
 ### Fixed

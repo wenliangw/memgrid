@@ -19,7 +19,7 @@ const program = new Command();
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.5.4');
+  .version('0.6.0');
 
 program
   .command('init')
@@ -128,6 +128,9 @@ program
         console.log(`  ${icon} ${a.message}`);
         console.log(`     → ${a.file}`);
       }
+    }
+    if (result.autoLearnedUnits > 0) {
+      console.log(`\n🧠 Auto-learned: ${result.autoLearnedUnits} new memory unit(s)`);
     }
     console.log(`\n⏱️  Done in ${result.elapsedMs}ms`);
   });
