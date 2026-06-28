@@ -12,6 +12,7 @@ import {
   ConfigScanner,
 } from '../scanner/index.js';
 import { startMCPServer } from './mcp-server.js';
+import { injectMemGridFlow } from '../claude-md.js';
 
 const program = new Command();
 
@@ -65,6 +66,13 @@ program
     }
     console.log(`\nTotal: ${stats.totalUnits} units`);
     console.log(`Storage: .claude/memory-grid/`);
+
+    const result = injectMemGridFlow(root);
+    if (result.action === 'created') {
+      console.log('\n📄 CLAUDE.md: created');
+    } else if (result.action === 'injected') {
+      console.log('\n📄 CLAUDE.md: injected MemGrid flow');
+    }
   });
 
 program
