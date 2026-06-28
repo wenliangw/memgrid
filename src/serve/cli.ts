@@ -12,13 +12,14 @@ import {
   ConfigScanner,
 } from '../scanner/index.js';
 import { startMCPServer } from './mcp-server.js';
+import { injectHooks } from '../hooks.js';
 
 const program = new Command();
 
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.5.1');
+  .version('0.5.2');
 
 program
   .command('init')
@@ -65,6 +66,20 @@ program
     }
     console.log(`\nTotal: ${stats.totalUnits} units`);
     console.log(`Storage: .claude/memory-grid/`);
+
+    // Auto-configure memory sync hooks
+    const hookResult = injectHooks(root);
+    if (hookResult.actions.length > 0) {
+      console.log('\n🔗 Auto-sync hooks:');
+      if (hookResult.actions.includes('claude-post-completion')) {
+        const status = hookResult.details.claudeSettings === 'created' ? 'created' : 'merged';
+        console.log(`  .claude/settings.json: ${status} PostCompletion hook`);
+      }
+      if (hookResult.actions.includes('git-post-commit')) {
+        console.log('  post-commit hook: created');
+      }
+      console.log('\n  ✅ Memory grid will auto-sync on task completion & git commit');
+    }
   });
 
 program

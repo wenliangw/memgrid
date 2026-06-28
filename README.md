@@ -246,6 +246,39 @@ MemGrid outputs **standardized Markdown context** consumable by any AI coding to
 memgrid serve
 ```
 
+## 🔄 Auto-Sync Hooks
+
+`memgrid init` automatically configures hooks so your memory grid stays up to date without manual effort:
+
+| Hook | Trigger | What it does |
+|------|---------|--------------|
+| **PostCompletion** | Claude Code finishes a task | Runs `memgrid sync` automatically |
+| **post-commit** | `git commit` | Runs `memgrid sync` (covers non-Claude changes) |
+
+All injections are **non-destructive** — existing config is merged, never overwritten.
+
+## 📝 CLAUDE.md Integration (optional)
+
+To make your AI agent proactive about memory, add these sections to your CLAUDE.md:
+
+```markdown
+## MemGrid
+
+Before any task, search the memory grid for relevant context:
+
+```bash
+npx memgrid search "<what you're about to do>" --max 10
+```
+
+After completing code changes, sync the grid back:
+
+```bash
+npx memgrid sync
+```
+```
+
+> ⚠️ MemGrid won't touch your CLAUDE.md. The hooks above handle automatic sync. This snippet is just a recommendation — add it if you want your AI agent to actively *search* the grid before starting.
+
 ## License
 
 MIT
