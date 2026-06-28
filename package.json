@@ -40,7 +40,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wenliangw/memgrid"
+    "url": "git+https://github.com/wenliangw/memgrid.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1",
