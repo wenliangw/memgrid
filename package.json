@@ -48,11 +48,4 @@
     "typescript": "^6",
     "vitest": "^4"
   },
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "^11.5.0",
-      "onFail": "download"
-    }
-  }
 }
