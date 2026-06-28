@@ -49,6 +49,8 @@
     "ts-morph": "^28"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.1.0",
+    "@commitlint/config-conventional": "^21.1.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26",
     "@typescript-eslint/eslint-plugin": "^8.62.0",
