@@ -2,6 +2,14 @@
 
 All notable changes to MemGrid.
 
+## v0.5.1 — Search Bug Fix (2026-06-28)
+
+### Fixed
+- `memgrid search` returning empty results after fresh init
+  - Root cause: ES2022 `#private` fields broke internal cache access
+  - Fix: `listUnitsSync()` public method replaces direct private field access
+  - Also added `store.load()` to `search()`, `sync()`, `stats()` entry points
+
 ## v0.5.0 — Multi-Language + Incremental Sync (2026-06-28)
 
 ### Added — Language-Agnostic Scanner Architecture
