@@ -157,7 +157,7 @@ export class RetrieveEngine {
       const usageBonus = Math.min(unit.meta.usage_count / 50, 0.2);
 
       let score = keywordScore * 0.7 + associationBonus * 0.2 + usageBonus * 0.1;
-      if (unit.type === 'pattern') score *= 0.5;
+      if (unit.type === "pattern") score *= 0.8;
       matchedUnits.push({ unit, score });
     }
 
