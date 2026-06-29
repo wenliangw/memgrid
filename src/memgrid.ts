@@ -3,12 +3,14 @@ import * as crypto from 'crypto';
 import * as path from 'path';
 import type {
   MemoryUnit,
+  MemoryUnitType,
   ScanOptions,
   SearchOptions,
   SearchResult,
   SyncOptions,
   SyncResult,
   FileSnapshot,
+  ConflictResult,
 } from './shared/types.js';
 import { FileStore } from './store/file-store.js';
 import {
@@ -220,6 +222,111 @@ export class MemGrid {
     unit.meta.updated = new Date().toISOString();
     this.store.saveUnit(unit);
     return unit;
+  }
+
+  /**
+   * Detect potentially conflicting memory units.
+   *
+   * Two units conflict if they share the same type and their summaries
+   * have high keyword overlap but describe opposite things — e.g.
+   * "prefer Dialog over Collapse" vs "prefer Collapse over Dialog".
+   *
+   * Returns conflicts sorted by overlap score (highest first).
+   */
+  detectConflicts(): ConflictResult[] {
+    const units = this.store.listUnitsSync({ includeCandidate: true }) || [];
+    const conflicts: ConflictResult[] = [];
+
+    // Group by type — only some types can meaningfully conflict
+    const conflictTypes: MemoryUnitType[] = [
+      'style_preference',
+      'architecture_principle',
+      'pattern',
+      'error_solution',
+      'decision',
+    ];
+
+    for (const cType of conflictTypes) {
+      const group = units.filter(
+        (u) => u.type === cType && (u.meta.status === 'active' || u.meta.status === 'candidate'),
+      );
+
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const overlap = this.keywordOverlap(group[i], group[j]);
+          // High overlap (>0.6) with same type = potential conflict
+          if (overlap >= 0.6) {
+            // Check if they describe opposing things (simple heuristics)
+            const hasOpposition = this.detectOpposition(group[i].summary, group[j].summary);
+
+            conflicts.push({
+              unitA: group[i],
+              unitB: group[j],
+              overlapScore: overlap,
+              hasOpposition,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by overlap score descending
+    conflicts.sort((a, b) => b.overlapScore - a.overlapScore);
+    return conflicts;
+  }
+
+  /**
+   * Simple keyword overlap score between two units (Jaccard-like).
+   */
+  private keywordOverlap(a: MemoryUnit, b: MemoryUnit): number {
+    const tokensA = new Set(
+      `${a.summary} ${a.content.description}`
+        .toLowerCase()
+        .split(/\W+/)
+        .filter((t) => t.length > 2),
+    );
+    const tokensB = new Set(
+      `${b.summary} ${b.content.description}`
+        .toLowerCase()
+        .split(/\W+/)
+        .filter((t) => t.length > 2),
+    );
+
+    if (tokensA.size === 0 || tokensB.size === 0) return 0;
+
+    let intersection = 0;
+    for (const t of tokensA) {
+      if (tokensB.has(t)) intersection++;
+    }
+
+    return intersection / Math.min(tokensA.size, tokensB.size);
+  }
+
+  /**
+   * Detect opposing meaning using simple negation/contrast signals.
+   * Looks for: "not/never/instead/but/ > /vs/vs."
+   */
+  private detectOpposition(a: string, b: string): boolean {
+    const oppositeSignals = [' not ', " don't ", ' never ', ' instead ', ' rather ', ' but '];
+    const combined = (a + ' ' + b).toLowerCase();
+
+    // Signal 1: explicit negation/contrast words
+    if (oppositeSignals.some((s) => combined.includes(s))) return true;
+
+    // Signal 2: one uses " > " (prefer A over B pattern)
+    if (a.includes(' > ') && b.includes(' > ')) {
+      const preferredA = a.split(' > ')[0].trim();
+      const preferredB = b.split(' > ')[0].trim();
+      if (preferredA !== preferredB) return true;
+    }
+
+    // Signal 3: one mentions "prefer" with different targets
+    if (a.toLowerCase().includes('prefer') && b.toLowerCase().includes('prefer')) {
+      // Both express preferences — likely conflict if high overlap
+      return true;
+    }
+
+    return false;
   }
 
   async update(id: string, patch: Partial<MemoryUnit>): Promise<MemoryUnit | null> {

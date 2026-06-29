@@ -187,6 +187,18 @@ export class MemGridServer {
             required: ['action'],
           },
         },
+        {
+          name: 'memgrid_conflicts',
+          description:
+            'Detect potentially conflicting memory units. ' +
+            'Two units conflict when they share the same type (e.g. style_preference) ' +
+            'and have high keyword overlap but potentially opposing meanings. ' +
+            'Call this periodically to catch contradictory memories before they affect decisions.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
       ];
 
       return { tools };
@@ -450,6 +462,36 @@ export class MemGridServer {
                   isError: true,
                 };
             }
+          }
+
+          case 'memgrid_conflicts': {
+            const conflicts = this.mg.detectConflicts();
+
+            if (conflicts.length === 0) {
+              return {
+                content: [{ type: 'text', text: '✅ No conflicting memory units detected.' }],
+              };
+            }
+
+            const lines = [`⚠️  ${conflicts.length} potential conflict(s) detected:\n`];
+            for (const c of conflicts) {
+              const icon = c.hasOpposition ? '🔴' : '🟡';
+              lines.push(
+                `${icon} [${c.unitA.type}] overlap=${c.overlapScore.toFixed(2)}`,
+                `   A: ${c.unitA.summary.slice(0, 80)}`,
+                `   B: ${c.unitB.summary.slice(0, 80)}`,
+              );
+              if (c.hasOpposition) {
+                lines.push(`   ⚠️  These express opposing views.`);
+              }
+              lines.push(
+                `   IDs: ${c.unitA.id} | ${c.unitB.id}`,
+                `   Resolve: archive one via memgrid_review reject, or keep both if complementary.`,
+                '',
+              );
+            }
+
+            return { content: [{ type: 'text', text: lines.join('\n') }] };
           }
 
           default:

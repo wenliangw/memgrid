@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { FileStore } from '../src/store/file-store.js';
+import { MemGrid } from '../src/memgrid.js';
 import type { MemoryUnit } from '../src/shared/types.js';
 
 describe('Candidate review (v0.8)', () => {
@@ -116,5 +117,58 @@ describe('Candidate review (v0.8)', () => {
     const units = store.listUnitsSync();
     expect(units.length).toBe(1);
     expect(units[0].id).toBe('a_search');
+  });
+
+  it('detectConflicts finds opposing preferences', () => {
+    const a = makeUnit('s1', 'active');
+    a.type = 'style_preference';
+    a.summary = 'Prefer Dialog over Collapse';
+    a.content.description = 'Use Dialog for all modal interactions';
+    store.saveUnit(a);
+
+    const b = makeUnit('s2', 'active');
+    b.type = 'style_preference';
+    b.summary = 'Prefer Collapse over Dialog';
+    b.content.description = 'Use Collapse instead of Dialog';
+    store.saveUnit(b);
+
+    // Also add a non-conflicting unit
+    const c = makeUnit('s3', 'active');
+    c.type = 'error_solution';
+    c.summary = 'Fix N+1 query in list endpoint';
+    c.content.description = 'Use preload to batch load relations';
+    store.saveUnit(c);
+
+    // Use same store instance for MemGrid
+    const mg = new MemGrid(tmpDir);
+    mg.store = store;
+    const conflicts = mg.detectConflicts();
+
+    expect(conflicts.length).toBeGreaterThanOrEqual(1);
+    const styleConflict = conflicts.find(
+      (cf) => cf.unitA.type === 'style_preference' && cf.unitB.type === 'style_preference',
+    );
+    expect(styleConflict).toBeDefined();
+    expect(styleConflict!.hasOpposition).toBe(true);
+    expect(styleConflict!.overlapScore).toBeGreaterThan(0.5);
+  });
+
+  it('detectConflicts returns empty for unrelated units', () => {
+    const a = makeUnit('d1', 'active');
+    a.type = 'decision';
+    a.summary = 'Choose PostgreSQL for primary storage';
+    a.content.description = 'ACID compliance and team expertise';
+    store.saveUnit(a);
+
+    const b = makeUnit('d2', 'active');
+    b.type = 'decision';
+    b.summary = 'Use Redis for session caching';
+    b.content.description = 'Fast in-memory cache with TTL support';
+    store.saveUnit(b);
+
+    const mg = new MemGrid(tmpDir);
+    mg.store = store;
+    const conflicts = mg.detectConflicts();
+    expect(conflicts.length).toBe(0);
   });
 });
