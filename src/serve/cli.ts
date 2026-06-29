@@ -95,23 +95,13 @@ program
             createdAt: new Date().toISOString(),
           }, null, 2), 'utf-8');
 
+          // Generate migration guide
+          generateMigrationGuide(sessionPath, agent.name);
+
           configDomains[agent.name] = { type: 'agent-session', enabled: true };
           console.log(`  ✅ ${agent.name} session domain (${agent.purpose || 'no purpose configured'})`);
-
-          // Migrate existing OpenClaw atom memory to MemGrid
-          const workspaceDir = path.join(root, agent.workspaceDir || '');
-          if (fs.existsSync(path.join(workspaceDir, 'memory', 'atoms'))) {
-            const { migrateAgentAtoms } = await import('../domain/migrate-openclaw.js');
-            const migration = migrateAgentAtoms(workspaceDir, mg.store, agent.name);
-            if (migration.filesScanned > 0) {
-              console.log(`     📋 Migration: ${migration.filesScanned} atom files → ${migration.unitsCreated} memory units`);
-              if (migration.errors > 0) {
-                console.log(`     ⚠️  ${migration.errors} atom(s) failed to convert`);
-              }
-              // Re-scan associations
-              await mg.rebalance();
-            }
-          }
+          console.log(`     📋 Migration guide: .memgrid/sessions/${agent.name}/MIGRATION.md`);
+          console.log(`     → Tell your agent: "Please read MIGRATION.md and migrate existing memories into MemGrid"`);
         }
       }
 
@@ -873,4 +863,73 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
   }
 
   return agents;
+}
+
+/** Generate MIGRATION.md for an agent session domain */
+function generateMigrationGuide(sessionPath: string, agentName: string): void {
+  const guide = [
+    `# Memory Migration Guide — ${agentName}`,
+    '',
+    'This guide explains how to migrate your existing memory system',
+    'into this MemGrid session domain.',
+    '',
+    '## What MemGrid expects',
+    '',
+    'Each memory is stored as a JSON file. Use the `memgrid_add` MCP tool',
+    'or `memgrid add` CLI to write memories.',
+    '',
+    '### Memory unit structure',
+    '',
+    '```json',
+    '{',
+    '  "type": "method|pattern|error_solution|decision|style_preference|...",',
+    '  "summary": "One-line summary of what this memory represents",',
+    '  "description": "Detailed description",',
+    '  "sourceFile": "(optional) source file path"',
+    '}',
+    '```',
+    '',
+    '### Memory types',
+    '',
+    '| Type | Use for |',
+    '|------|--------|',
+    '| `method` | A function or method signature |',
+    '| `pattern` | Design pattern or recurring convention |',
+    '| `error_solution` | A bug and how it was fixed |',
+    '| `decision` | A code decision and its rationale |',
+    '| `style_preference` | A coding style preference |',
+    '| `rule_trigger` | When to apply a specific rule |',
+    '| `architecture_principle` | An architecture red line |',
+    '',
+    '## Migration steps',
+    '',
+    '1. Read your existing memory files (identify the format they use)',
+    '2. For each memory unit, map it to the closest MemGrid type above',
+    '3. Write it via `memgrid_add` with `status: "active"`',
+    '4. Run `memgrid rebalance` to assign storage tiers',
+    '5. Run `memgrid stats` to verify the migration count',
+    '',
+    '## Example type mapping',
+    '',
+    'If your existing memory system uses different type names, map them:',
+    '',
+    '| Your type | MemGrid type |',
+    '|-----------|-------------|',
+    '| event / log | `decision` |',
+    '| knowledge / fact | `pattern` |',
+    '| mistake / bug-fix | `error_solution` |',
+    '| rule / convention | `rule_trigger` |',
+    '| preference / habit | `style_preference` |',
+    '',
+    '## After migration',
+    '',
+    '- Run `memgrid review` to verify migrated memories',
+    '- Run `memgrid conflicts` to check for contradictions',
+    '- Tell your agent: "My memory system is now MemGrid-managed."',
+    '',
+    'Managed by MemGrid — this guide is generated during `memgrid init --server`.',
+  ];
+
+  const guidePath = path.join(sessionPath, 'MIGRATION.md');
+  fs.writeFileSync(guidePath, guide.join('\n'), 'utf-8');
 }
