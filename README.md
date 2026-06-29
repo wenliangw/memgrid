@@ -180,7 +180,7 @@ Token consumption reduced **~40%** vs full-codebase context (67K → ~55K total,
 
 ## 📁 File Format
 
-Memory units are stored as JSON in `.claude/memory-grid/units/` — **Git-friendly and human-readable**.
+Memory units are stored as JSON in `.memgrid/units/` — **Git-friendly and human-readable**.
 
 ```json
 {

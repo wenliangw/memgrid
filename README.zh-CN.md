@@ -182,7 +182,7 @@ Token 消耗相比全量代码库上下文降低约 **40%**（总量 67K → ~55
 
 ## 📁 文件格式
 
-记忆单元以 JSON 格式存储在 `.claude/memory-grid/units/` — **对 Git 友好，人类也可读**。
+记忆单元以 JSON 格式存储在 `.memgrid/units/` — **对 Git 友好，人类也可读**。
 
 ```json
 {

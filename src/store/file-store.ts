@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { MemoryUnit, MemoryGrid, MemoryUnitType } from '../shared/types.js';
 
-const GRID_DIR = '.claude/memory-grid';
+const GRID_DIR = '.memgrid';
 const UNITS_DIR = 'units';
 const ARCHIVE_DIR = 'archive';
 const MESH_FILE = 'mesh.json';
