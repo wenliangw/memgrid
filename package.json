@@ -4,10 +4,6 @@
   "description": "Project-level semantic memory system for AI coding agents. Replaces full-codebase context loading with a self-evolving knowledge-mesh.",
   "type": "module",
   "main": "dist/index.js",
-  "exports": {
-    ".": "./dist/index.js",
-    "./adapters": "./dist/adapters/index.js"
-  },
   "bin": {
     "memgrid": "dist/serve/cli.js"
   },
