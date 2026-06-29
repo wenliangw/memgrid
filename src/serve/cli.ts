@@ -95,14 +95,14 @@ program
             createdAt: new Date().toISOString(),
           }, null, 2), 'utf-8');
 
-          // Generate migration guide
-          generateMigrationGuide(sessionPath, agent.name);
-
           configDomains[agent.name] = { type: 'agent-session', enabled: true };
           console.log(`  ✅ ${agent.name} session domain (${agent.purpose || 'no purpose configured'})`);
-          console.log(`     📋 Migration guide: .memgrid/sessions/${agent.name}/MIGRATION.md`);
-          console.log(`     → Tell your agent: "Please read MIGRATION.md and migrate existing memories into MemGrid"`);
         }
+
+        // Generate global migration guide
+        generateMigrationGuide(dm.gridDir);
+        console.log(`\n  📋 Migration guide: ~/.memgrid/MIGRATION.md`);
+        console.log(`     → Tell your agent: "Please read MIGRATION.md and migrate existing memories into MemGrid"`);
       }
 
       // Generate OpenClaw Gateway config
@@ -866,9 +866,9 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
 }
 
 /** Generate MIGRATION.md for an agent session domain */
-function generateMigrationGuide(sessionPath: string, agentName: string): void {
+function generateMigrationGuide(gridDir: string): void {
   const guide = [
-    `# Memory Migration Guide — ${agentName}`,
+    '# Memory Migration Guide',
     '',
     'This guide explains how to migrate your existing memory system',
     'into this MemGrid session domain.',
@@ -930,6 +930,6 @@ function generateMigrationGuide(sessionPath: string, agentName: string): void {
     'Managed by MemGrid — this guide is generated during `memgrid init --server`.',
   ];
 
-  const guidePath = path.join(sessionPath, 'MIGRATION.md');
+  const guidePath = path.join(gridDir, 'MIGRATION.md');
   fs.writeFileSync(guidePath, guide.join('\n'), 'utf-8');
 }
