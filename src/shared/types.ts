@@ -33,7 +33,7 @@ export interface Association {
 
 /** Provenance chain: who created this memory and based on what */
 export interface Provenance {
-  createdBy: string; // "scanner:typescript" | "ai:claude" | "user:7c"
+  createdBy: string; // "scanner:typescript" | "ai:claude" | "user"
   basedOnTask?: string; // task summary that produced this memory
   evidenceUnits?: string[]; // IDs of units used as evidence
   timestamp: string;
@@ -193,4 +193,38 @@ export interface FileScanResult {
   file: string;
   units: MemoryUnit[];
   hash: string;
+}
+
+// ===== Multi-Domain Types (v0.10+) =====
+
+export type DomainType =
+  | 'project'
+  | 'server'
+  | 'toolkit'
+  | 'personality'
+  | 'agent-session'
+  | 'gateway'
+  | 'custom';
+
+export interface MemoryDomain {
+  name: string;
+  type: DomainType;
+  path: string;
+  description?: string;
+  enabled: boolean;
+}
+
+export interface UserGrid {
+  version: string;
+  user: string;
+  createdAt: string;
+  domains: MemoryDomain[];
+  crossDomainAssociations: CrossDomainAssociation[];
+}
+
+export interface CrossDomainAssociation {
+  from: { domain: string; unitId: string };
+  to: { domain: string; unitId: string };
+  relation: string;
+  weight: number;
 }
