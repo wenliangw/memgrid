@@ -2,6 +2,32 @@
 
 All notable changes to MemGrid.
 
+## v0.7.1 — README Rewrite + Chinese Docs (2026-06-29)
+
+### Changed
+- **README overhaul**: AI-native setup flow — tell your agent one sentence, no manual config
+- Integration section focused on Claude Code (auto MCP + hooks + CLAUDE.md)
+- New `README.zh-CN.md` — full Chinese translation
+- Badge row added (npm version, downloads, license)
+
+## v0.7.0 — NLP Learning + Perf Benchmarks + Test Expansion (2026-06-28 → 2026-06-29)
+
+### Added
+- **NLP natural language learning** (`memgrid learn`): describe a pattern in plain English, MemGrid auto-detects type and creates the unit (#17)
+- **4 performance benchmarks** with contract thresholds: load, search, bulk-save, LRU cache (#22)
+- **perf-check CI** — automated benchmark validation in CI pipeline (#21)
+- Sync phase unit tests + NLP tests + perf CI integration (#21)
+
+### Changed
+- ESLint reduced to **0 warnings** across entire codebase (#18)
+- Test suite expanded: 51 → 55 tests across 8 files
+
+### Fixed
+- repository.url format for npm Trusted Publishing compatibility (#19)
+
+### Removed
+- Failing auto-publish GitHub Actions workflow (#20)
+
 ## v0.6.0 — Cognitive Sync Pipeline + Learning Engine (2026-06-28)
 
 ### Added
