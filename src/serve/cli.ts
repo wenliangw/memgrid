@@ -109,6 +109,14 @@ program
           console.log(
             `  ✅ ${agent.name} session domain (${agent.purpose || 'no purpose configured'})`,
           );
+
+          // Inject MemGrid block into AGENTS.md
+          if (agent.workspaceDir) {
+            const agentsMdPath = path.join(agent.workspaceDir, 'AGENTS.md');
+            if (fs.existsSync(agentsMdPath)) {
+              injectMemGridAgentsBlock(agentsMdPath, agent.name);
+            }
+          }
         }
 
         // Generate global migration guide
@@ -1011,4 +1019,42 @@ function registerOpenClawMcp(configPath: string): void {
   } catch {
     console.log('  ⚠️  Could not parse openclaw.json — add MCP manually');
   }
+}
+
+/** Inject MemGrid block into Agent's AGENTS.md (like CLAUDE.md for project mode) */
+function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void {
+  const existing = fs.readFileSync(agentsMdPath, 'utf-8');
+  if (existing.includes('<!-- MEMGRID:START -->')) {
+    console.log(`     AGENTS.md: MemGrid block already exists`);
+    return;
+  }
+
+  const block = [
+    '',
+    '<!-- MEMGRID:START -->',
+    '',
+    '## 🧠 MemGrid — Project Memory System',
+    '',
+    'This agent has access to MemGrid memory tools. Before starting any task, search the memory grid for relevant context.',
+    '',
+    'Use the MCP tool `memgrid_search` to search the memory grid.',
+    'Use `memgrid_review` to confirm or reject candidate (auto-learned) memories.',
+    'Use `memgrid_add` to record new learnings after completing a task.',
+    '',
+    '```',
+    '# Search project memory',
+    'memgrid_search(query="your task description", maxResults=10)',
+    '',
+    '# After completing a task',
+    'memgrid_suggest(taskSummary="what you did", outcome="result")',
+    '',
+    '# Review candidate memories',
+    'memgrid_review(action="list")  → memgrid_review(action="accept", unitId="id")',
+    '```',
+    '',
+    '<!-- MEMGRID:END -->',
+  ];
+
+  fs.appendFileSync(agentsMdPath, block.join('\n') + '\n', 'utf-8');
+  console.log(`     AGENTS.md: MemGrid block injected for ${agentName}`);
 }
