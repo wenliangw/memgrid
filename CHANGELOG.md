@@ -2,6 +2,36 @@
 
 All notable changes to MemGrid.
 
+## v0.10.0 — Multi-Domain Architecture (2026-06-30)
+
+### Added
+- **Multi-domain architecture**: one person, one cognitive grid, multiple domains
+- **DomainManager**: user grid init, domain registration/detection/unregistration
+- **Three CLI init modes**:
+  - User grid: `memgrid init` → `~/.memgrid/` with personality domain
+  - Project domain: `memgrid init` (in project dir) → `.memgrid/` with auto-config
+  - OpenClaw server: `memgrid init --server --openclaw` → agent session domains
+- **MemoryDomain, UserGrid, CrossDomainAssociation types**
+- **Automatic project configuration**:
+  - `.gitignore` (excludes personal memories)
+  - `.claude/settings.json` (MCP + hooks)
+  - `CLAUDE.md` MemGrid block injection (`<!-- MEMGRID:START/END -->`)
+  - `.memgrid/README.md` for AI tool discoverability
+  - Global Claude Code MCP registration (`~/.claude/settings.json`)
+- **`memgrid domains`** CLI command (list/set/unregister)
+- **Domain name auto-detection** from package.json, go.mod, Cargo.toml
+- **Domain type auto-detection** from project structure
+- **OpenClaw server mode**: dynamic agent detection + openclaw-config.json + MIGRATION.md guide
+- **Privacy-safe**: zero hardcoded agent names, project names, or workspace paths
+
+### Changed
+- `MemoryUnit.meta.status` extended with `candidate` (v0.8)
+- `MemoryUnit.meta` extended with `tier` and `lastAccessedAt` (v0.9)
+- `SearchOptions` extended with `tiers` filter (v0.9)
+
+### Tests
+- 80 tests (68 existing + 12 domain manager tests)
+
 ## v0.9.0 — Tiered Storage: Hot/Warm/Cold/Frozen (2026-06-29)
 
 ### Added
