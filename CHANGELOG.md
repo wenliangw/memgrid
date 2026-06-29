@@ -2,6 +2,32 @@
 
 All notable changes to MemGrid.
 
+## v0.9.0 — Tiered Storage: Hot/Warm/Cold/Frozen (2026-06-29)
+
+### Added
+- **Four-tier memory storage**: hot, warm, cold, frozen — based on access recency + frequency
+- **Rebalance engine**: `memgrid rebalance` assigns tiers to all active units
+  - hot: usage_count >= 3 AND last accessed within 7 days
+  - warm: last accessed within 30 days (default for new units)
+  - cold: last accessed 30+ days ago
+  - frozen: last accessed 90+ days ago OR cold overflow
+- **Cold overflow freezing**: when cold exceeds capacity (max 30% of total, min 100),
+  lowest `retention_score` units are frozen
+- **retention_score**: weighted by confidence, usage_count, type importance, and associations
+- **Frozen recovery**: `memgrid search-frozen` for clue-based recall, `memgrid thaw` to restore
+- **Tier-aware search ranking**: hot ×1.0, warm ×0.7, cold ×0.4, frozen excluded by default
+- **`memgrid search --tier`** filter + `memgrid stats` tier distribution
+- **Auto-rebalance**: `memgrid sync` triggers rebalance when files change
+- **MCP tools**: `memgrid_rebalance`, `memgrid_search_frozen`, `memgrid_thaw`
+
+### Changed
+- All scanners now set `tier: 'warm'` on new units
+- `FileStore.touch()` now updates `lastAccessedAt`
+- `MemoryUnit.meta` extended with `tier` and `lastAccessedAt` fields
+
+### Tests
+- 68 tests (63 existing + 5 tier tests: promote, demote, freeze overflow, thaw, searchFrozen)
+
 ## v0.8.0 — Write Gating + Provenance + Conflict Detection (2026-06-29)
 
 ### Added
