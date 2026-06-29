@@ -4,6 +4,7 @@ import * as path from 'path';
 import type {
   MemoryUnit,
   MemoryUnitType,
+  MemoryTier,
   ScanOptions,
   SearchOptions,
   SearchResult,
@@ -11,6 +12,7 @@ import type {
   SyncResult,
   FileSnapshot,
   ConflictResult,
+  RebalanceResult,
 } from './shared/types.js';
 import { FileStore } from './store/file-store.js';
 import {
@@ -344,6 +346,177 @@ export class MemGrid {
     this.store.archiveUnit(id);
   }
 
+  // ===== Tiered Storage Engine (v0.9+) =====
+
+  /**
+   * Rebalance all memory units across tiers.
+   *
+   * Rules:
+   * - hot: usage_count >= 3 AND lastAccessedAt within 7 days
+   * - warm: default for new/active units, OR hot demoted
+   * - cold: lastAccessedAt > 30 days ago (from warm)
+   * - frozen: lastAccessedAt > 90 days ago (from cold) — compressed, not searchable by default
+   *
+   * Cold tier has a capacity cap (max 30% of total, min 100).
+   * When cold overflows, lowest retention_score units move to frozen.
+   *
+   * Candidate units are excluded from tiering.
+   */
+  async rebalance(): Promise<RebalanceResult> {
+    this.store.load();
+    const allUnits = this.store.listUnitsSync({ includeCandidate: true }) || [];
+
+    // Only rebalance active and stale units
+    const activeUnits = allUnits.filter(
+      (u) => u.meta.status === 'active' || u.meta.status === 'stale',
+    );
+
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    const result: RebalanceResult = {
+      hot: 0,
+      warm: 0,
+      cold: 0,
+      frozen: 0,
+      promoted: 0,
+      demoted: 0,
+      frozenCount: 0,
+      thawedCount: 0,
+    };
+
+    // Phase 1: Assign tiers based on access patterns
+    const coldCandidates: MemoryUnit[] = [];
+
+    for (const unit of activeUnits) {
+      const prevTier = unit.meta.tier;
+      const accessedAt = unit.meta.lastAccessedAt
+        ? new Date(unit.meta.lastAccessedAt)
+        : new Date(unit.meta.updated);
+
+      let newTier: MemoryTier;
+
+      if (unit.meta.usage_count >= 3 && accessedAt >= sevenDaysAgo) {
+        newTier = 'hot';
+      } else if (accessedAt >= thirtyDaysAgo) {
+        newTier = 'warm';
+      } else if (accessedAt >= ninetyDaysAgo) {
+        newTier = 'cold';
+        coldCandidates.push(unit);
+      } else {
+        newTier = 'cold';
+        coldCandidates.push(unit);
+      }
+
+      unit.meta.tier = newTier;
+      unit.meta.updated = now.toISOString();
+
+      if (newTier === 'hot') result.hot++;
+      else if (newTier === 'warm') result.warm++;
+      else result.cold++;
+
+      if (prevTier && prevTier !== newTier) {
+        if (
+          (prevTier === 'warm' && newTier === 'hot') ||
+          (prevTier === 'cold' && newTier === 'warm') ||
+          (prevTier === 'cold' && newTier === 'hot')
+        ) {
+          result.promoted++;
+        } else {
+          result.demoted++;
+        }
+      }
+    }
+
+    // Phase 2: Cold tier overflow → freeze lowest retention_score units
+    const totalActive = activeUnits.length;
+    const coldCapacity = Math.max(100, Math.floor(totalActive * 0.3));
+    const currentCold = coldCandidates.length;
+
+    if (currentCold > coldCapacity) {
+      // Sort cold candidates by retention_score ascending (lowest first → freeze)
+      coldCandidates.sort((a, b) => this.retentionScore(a) - this.retentionScore(b));
+
+      const toFreeze = coldCandidates.slice(0, currentCold - coldCapacity);
+      for (const unit of toFreeze) {
+        unit.meta.tier = 'frozen';
+        unit.meta.updated = now.toISOString();
+        result.cold--;
+        result.frozen++;
+        result.frozenCount++;
+      }
+    }
+
+    // Persist all changes
+    for (const unit of activeUnits) {
+      this.store.saveUnit(unit);
+    }
+
+    return result;
+  }
+
+  /**
+   * Thaw a frozen unit — restore it to warm tier so it appears in normal search.
+   */
+  async thaw(id: string): Promise<MemoryUnit | null> {
+    const unit = this.store.getUnit(id);
+    if (!unit) return null;
+    if (unit.meta.tier !== 'frozen') return null;
+
+    const now = new Date().toISOString();
+    unit.meta.tier = 'warm';
+    unit.meta.lastAccessedAt = now;
+    unit.meta.updated = now;
+    unit.meta.usage_count = 1; // Reset — re-earn hot status
+
+    this.store.saveUnit(unit);
+    return unit;
+  }
+
+  /**
+   * Search frozen tier for a specific clue (exact method name, keyword, etc).
+   */
+  searchFrozen(clue: string): MemoryUnit[] {
+    const allUnits = this.store.listUnitsSync({ includeCandidate: true }) || [];
+    const frozen = allUnits.filter((u) => u.meta.tier === 'frozen');
+
+    const clueLower = clue.toLowerCase();
+    return frozen.filter((u) => {
+      const text = `${u.summary} ${u.signatures.join(' ')} ${u.content.description}`.toLowerCase();
+      return text.includes(clueLower);
+    });
+  }
+
+  /**
+   * Calculate retention score for a cold-tier unit.
+   * Higher score = more worth keeping in cold (not freezing).
+   * Lower score = freeze first.
+   */
+  private retentionScore(unit: MemoryUnit): number {
+    const typeWeights: Record<string, number> = {
+      method: 0.9,
+      component: 0.9,
+      config: 0.8,
+      rule_trigger: 0.8,
+      architecture_principle: 0.8,
+      pattern: 0.6,
+      error_solution: 0.5,
+      decision: 0.4,
+      style_preference: 0.3,
+      skill_trigger: 0.5,
+      mcp_trigger: 0.5,
+    };
+
+    const typeWeight = typeWeights[unit.type] ?? 0.5;
+    const confidenceFactor = unit.meta.confidence;
+    const usageFactor = Math.min(1, unit.meta.usage_count / 10); // cap at 10
+    const hasAssociations = unit.associations.length > 0 ? 0.5 : 0; // being referenced matters
+
+    return confidenceFactor * 0.3 + usageFactor * 0.3 + typeWeight * 0.2 + hasAssociations * 0.2;
+  }
+
   context(result: SearchResult): string {
     return this.semantic.toContext(result);
   }
@@ -369,7 +542,14 @@ export class MemGrid {
    */
   async sync(options: SyncOptions): Promise<SyncResult> {
     this.store.load();
-    return this.syncEngine.sync(options);
+    const result = await this.syncEngine.sync(options);
+
+    // Auto-rebalance tiers after sync (v0.9+)
+    if (result.changedFiles.length > 0 || result.candidateUnitsCreated > 0) {
+      await this.rebalance();
+    }
+
+    return result;
   }
 
   async stats() {

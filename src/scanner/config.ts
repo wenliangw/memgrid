@@ -68,6 +68,7 @@ export class ConfigScanner implements Scanner {
               confidence: 0.95,
               usage_count: 0,
               status: 'active',
+              tier: 'warm',
             },
           });
         }
@@ -102,6 +103,7 @@ export class ConfigScanner implements Scanner {
             confidence: 0.9,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         });
       } catch {
@@ -137,6 +139,7 @@ export class ConfigScanner implements Scanner {
           confidence: 0.9,
           usage_count: 0,
           status: 'active',
+          tier: 'warm',
         },
       });
     }
@@ -168,6 +171,7 @@ export class ConfigScanner implements Scanner {
           confidence: 0.9,
           usage_count: 0,
           status: 'active',
+          tier: 'warm',
         },
       });
     }
@@ -197,6 +201,7 @@ export class ConfigScanner implements Scanner {
             confidence: 0.9,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         });
       }

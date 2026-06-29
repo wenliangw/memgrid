@@ -79,6 +79,7 @@ export class MarkdownScanner implements Scanner {
               confidence: 0.5, // lower confidence — docs may be stale
               usage_count: 0,
               status: 'active',
+              tier: 'warm',
             },
           });
         }

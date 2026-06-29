@@ -119,6 +119,7 @@ export class PythonScanner implements Scanner {
             confidence: 0.7,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         });
 
@@ -158,6 +159,7 @@ export class PythonScanner implements Scanner {
             confidence: currentClass ? 0.75 : 0.7,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         };
 

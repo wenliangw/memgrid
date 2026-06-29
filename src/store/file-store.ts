@@ -225,6 +225,7 @@ export class FileStore {
     const unit = this.cache.get(id) || this.archiveCache.get(id);
     if (unit) {
       unit.meta.usage_count++;
+      unit.meta.lastAccessedAt = new Date().toISOString();
       this.dirtyUsage.add(id);
     }
   }
@@ -282,6 +283,7 @@ export class FileStore {
   getStats() {
     this.ensureLoaded();
     const typeDistribution: Record<string, number> = {};
+    const tierDistribution: Record<string, number> = {};
     let active = 0;
     let candidate = 0;
 
@@ -289,6 +291,8 @@ export class FileStore {
       typeDistribution[unit.type] = (typeDistribution[unit.type] || 0) + 1;
       if (unit.meta.status === 'active') active++;
       if (unit.meta.status === 'candidate') candidate++;
+      const tier = unit.meta.tier || 'warm';
+      tierDistribution[tier] = (tierDistribution[tier] || 0) + 1;
     }
 
     return {
@@ -297,6 +301,7 @@ export class FileStore {
       candidateUnits: candidate,
       archivedUnits: this.archiveCache.size,
       typeDistribution,
+      tierDistribution,
     };
   }
 

@@ -57,6 +57,7 @@ export class RulesScanner implements Scanner {
           confidence: 0.8,
           usage_count: 0,
           status: 'active',
+          tier: 'warm',
         },
       });
     }

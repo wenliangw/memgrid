@@ -172,3 +172,137 @@ describe('Candidate review (v0.8)', () => {
     expect(conflicts.length).toBe(0);
   });
 });
+
+describe('Tiered storage (v0.9)', () => {
+  let tmpDir: string;
+  let store: FileStore;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memgrid-tier-'));
+    store = new FileStore(tmpDir);
+    store.ensureDirs();
+    store.load();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeTierUnit(id: string, tier: string, accessedAt: string, usage: number): MemoryUnit {
+    return {
+      id,
+      type: 'method',
+      summary: `Method ${id}`,
+      signatures: [id],
+      content: { description: `Description for ${id}` },
+      associations: [],
+      meta: {
+        created: '2026-01-01',
+        updated: '2026-01-01',
+        confidence: 0.8,
+        usage_count: usage,
+        status: 'active',
+        tier: tier as any,
+        lastAccessedAt: accessedAt,
+      },
+    };
+  }
+
+  it('rebalance promotes high-usage recent units to hot', async () => {
+    const _now = new Date().toISOString();
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    store.saveUnit(makeTierUnit('u1', 'warm', threeDaysAgo, 5)); // should be hot (usage>=3, recent)
+    store.saveUnit(makeTierUnit('u2', 'warm', threeDaysAgo, 1)); // should stay warm (usage<3)
+
+    const mg = new MemGrid(tmpDir);
+    mg.store = store;
+    const result = await mg.rebalance();
+
+    expect(result.hot).toBe(1);
+    expect(result.warm).toBe(1);
+    expect(result.promoted).toBe(1);
+
+    const u1 = store.getUnit('u1');
+    expect(u1!.meta.tier).toBe('hot');
+  });
+
+  it('rebalance demotes old unused units to cold', async () => {
+    const _now = new Date().toISOString();
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+
+    store.saveUnit(makeTierUnit('u1', 'warm', sixtyDaysAgo, 1)); // should go cold (>30 days)
+
+    const mg = new MemGrid(tmpDir);
+    mg.store = store;
+    const result = await mg.rebalance();
+
+    expect(result.cold).toBe(1);
+    expect(result.demoted).toBe(1);
+
+    const u1 = store.getUnit('u1');
+    expect(u1!.meta.tier).toBe('cold');
+  });
+
+  it('rebalance freezes cold overflow', async () => {
+    const ninetyDaysAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Create many units so cold capacity is small relative to total
+    // Cold capacity = max(100, total * 0.3)
+    // First create 300 warm units (to push total up) + 100 old cold ones
+    for (let i = 0; i < 100; i++) {
+      const unit = makeTierUnit(`warm_${i}`, 'warm', new Date().toISOString(), 0);
+      store.saveUnit(unit);
+    }
+    // Create 200 cold units (way over 30% of 300 = 90 cold capacity)
+    for (let i = 0; i < 200; i++) {
+      const unit = makeTierUnit(`cold_${i}`, 'cold', ninetyDaysAgo, 0);
+      unit.type = 'style_preference'; // low type weight → low retention score
+      store.saveUnit(unit);
+    }
+
+    const mg = new MemGrid(tmpDir);
+    mg.store = store;
+    const result = await mg.rebalance();
+
+    // Capacity: max(100, 300*0.3) = max(100, 90) = 100
+    // Current cold: 200 → overflow: 200 - 100 = 100 to freeze
+    expect(result.frozenCount).toBeGreaterThan(0);
+
+    // Verify some units were frozen
+    const frozen = store
+      .listUnitsSync({ includeCandidate: true })!
+      .filter((u) => u.meta.tier === 'frozen');
+    expect(frozen.length).toBeGreaterThan(0);
+  });
+
+  it('thaw restores frozen unit to warm', async () => {
+    const ninetyDaysAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
+    const unit = makeTierUnit('f1', 'frozen', ninetyDaysAgo, 0);
+    store.saveUnit(unit);
+
+    const mg = new MemGrid(tmpDir);
+    mg.store = store;
+
+    const thawed = await mg.thaw('f1');
+    expect(thawed).not.toBeNull();
+    expect(thawed!.meta.tier).toBe('warm');
+    expect(thawed!.meta.usage_count).toBe(1); // reset to re-earn hot status
+  });
+
+  it('searchFrozen finds units by clue', () => {
+    const ninetyDaysAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
+    const u1 = makeTierUnit('f_search', 'frozen', ninetyDaysAgo, 0);
+    u1.summary = 'CreationDomainService.create — Create new work';
+    u1.signatures = ['CreationDomainService.create'];
+    u1.content.description = 'Creates a new work entity with ownership validation';
+    store.saveUnit(u1);
+
+    const mg = new MemGrid(tmpDir);
+    mg.store = store;
+
+    const results = mg.searchFrozen('CreationDomainService');
+    expect(results.length).toBe(1);
+    expect(results[0].id).toBe('f_search');
+  });
+});
