@@ -2,6 +2,30 @@
 
 All notable changes to MemGrid.
 
+## v0.8.0 — Write Gating + Provenance + Conflict Detection (2026-06-29)
+
+### Added
+- **Candidate review workflow**: AI-generated memories now enter `candidate` status — not searchable until confirmed
+- **`memgrid review`** CLI command (list/accept/reject/accept-all/reject-all)
+- **`memgrid_review`** MCP tool — agents present candidates to users in-conversation
+- **Provenance tracking**: `createdBy`, `basedOnTask`, `evidenceUnits`, `timestamp` on every MemoryUnit
+- **Conflict detection**: `memgrid conflicts` CLI + `memgrid_conflicts` MCP tool
+  - Detects same-type units with high keyword overlap + opposing semantics
+  - Heuristics: negation words, "prefer X > Y" patterns, contrasting preferences
+- **Hook failure visibility**: sync events logged to `.claude/memory-grid/sync.log`
+  - `SYNC_START/SUCCESS/FAILURE` entries with timestamps and hostname
+  - Failed syncs now emit visible warnings instead of silent `2>/dev/null || true`
+
+### Changed
+- `memgrid_add` and `memgrid_suggest` default to creating `candidate` units
+- `memgrid search` and `listUnits` exclude candidate units (unless `includeCandidate: true`)
+- `memgrid stats` now shows candidate count separately
+- `memgrid sync` output includes candidate count with review hint
+- Hook commands (`PostCompletion`, `post-commit`) replaced with structured logging
+
+### Tests
+- 63 tests (55 existing + 8 new: 6 candidate workflow + 2 conflict detection)
+
 ## v0.7.1 — README Rewrite + Chinese Docs (2026-06-29)
 
 ### Changed
