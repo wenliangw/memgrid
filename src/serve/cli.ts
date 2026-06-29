@@ -20,7 +20,7 @@ const program = new Command();
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.6.0');
+  .version('0.8.0');
 
 program
   .command('init')
@@ -133,6 +133,10 @@ program
     if (result.autoLearnedUnits > 0) {
       console.log(`\n🧠 Auto-learned: ${result.autoLearnedUnits} new memory unit(s)`);
     }
+    if (result.candidateUnitsCreated > 0) {
+      console.log(`📝 Candidates:    ${result.candidateUnitsCreated} unit(s) pending review`);
+      console.log(`   Run 'memgrid review' to confirm or reject them.`);
+    }
     console.log(`\n⏱️  Done in ${result.elapsedMs}ms`);
   });
 
@@ -199,6 +203,81 @@ program
   });
 
 program
+  .command('review')
+  .description('Review and confirm or reject candidate memory units')
+  .option('-l, --list', 'List all candidate units pending review')
+  .option('-a, --accept <id>', 'Accept a specific candidate unit')
+  .option('-r, --reject <id>', 'Reject and archive a specific candidate unit')
+  .option('--accept-all', 'Accept all candidate units')
+  .option('--reject-all', 'Reject all candidate units')
+  .action(async (options) => {
+    const mg = new MemGrid(process.cwd());
+    mg.store.load();
+    const allUnits = mg.store.listUnitsSync({ includeCandidate: true }) || [];
+    const candidates = allUnits.filter((u) => u.meta.status === 'candidate');
+
+    if (
+      options.list ||
+      (!options.accept && !options.reject && !options.acceptAll && !options.rejectAll)
+    ) {
+      if (candidates.length === 0) {
+        console.log('✅ No candidate memories pending review.');
+        return;
+      }
+      console.log(`📋 ${candidates.length} candidate memory unit(s) pending review:\n`);
+      for (const c of candidates) {
+        const creator = c.provenance?.createdBy || 'unknown';
+        const task = c.provenance?.basedOnTask ? ` — ${c.provenance.basedOnTask.slice(0, 60)}` : '';
+        console.log(`  [${c.id}] ${c.type} | ${c.summary.slice(0, 80)}`);
+        console.log(`      ⚡ ${c.meta.confidence} | from: ${creator}${task}`);
+      }
+      console.log('');
+      console.log('Use --accept <id> / --reject <id> to confirm or reject.');
+      console.log('Use --accept-all / --reject-all to handle all at once.');
+      return;
+    }
+
+    if (options.accept) {
+      const result = await mg.acceptCandidate(options.accept);
+      if (result) {
+        console.log(`✅ Accepted: [${result.id}] ${result.summary.slice(0, 80)}`);
+        console.log('   Now searchable as active.');
+      } else {
+        console.log(`❌ Unit not found or not a candidate: ${options.accept}`);
+      }
+    }
+
+    if (options.reject) {
+      const unit = mg.store.getUnit(options.reject);
+      if (unit && unit.meta.status === 'candidate') {
+        await mg.archive(options.reject);
+        console.log(`🗑️  Rejected: [${options.reject}] ${unit.summary.slice(0, 80)}`);
+        console.log('   Archived (not searchable).');
+      } else {
+        console.log(`❌ Unit not found or not a candidate: ${options.reject}`);
+      }
+    }
+
+    if (options.acceptAll) {
+      let count = 0;
+      for (const c of candidates) {
+        await mg.acceptCandidate(c.id);
+        count++;
+      }
+      console.log(`✅ Accepted all ${count} candidate unit(s). Now searchable.`);
+    }
+
+    if (options.rejectAll) {
+      let count = 0;
+      for (const c of candidates) {
+        await mg.archive(c.id);
+        count++;
+      }
+      console.log(`🗑️  Rejected all ${count} candidate unit(s). Archived.`);
+    }
+  });
+
+program
   .command('stats')
   .description('Show grid statistics')
   .action(async () => {
@@ -207,11 +286,17 @@ program
     console.log('📊 MemGrid Statistics\n');
     console.log(`  Total units:    ${stats.totalUnits}`);
     console.log(`  Active:         ${stats.activeUnits}`);
+    console.log(`  Candidate:      ${stats.candidateUnits ?? 0}`);
     console.log(`  Archived:       ${stats.archivedUnits}`);
     console.log(`  Last scan:      ${stats.lastScanAt || 'Never'}`);
     console.log(`\n  Type distribution:`);
     for (const [type, count] of Object.entries(stats.typeDistribution)) {
       console.log(`    ${type}: ${count}`);
+    }
+    if ((stats.candidateUnits ?? 0) > 0) {
+      console.log(
+        `\n  ⚠️  ${stats.candidateUnits} candidate unit(s) pending review. Run: memgrid review`,
+      );
     }
   });
 

@@ -10,6 +10,7 @@ const MESH_FILE = 'mesh.json';
 export interface ListFilter {
   type?: MemoryUnitType;
   includeArchived?: boolean;
+  includeCandidate?: boolean;
 }
 
 /**
@@ -130,12 +131,15 @@ export class FileStore {
   /**
    * Synchronous version of listUnits — only reads from in-memory cache.
    * Returns empty if cache not loaded yet. Call load() first.
+   * Default filter: excludes 'candidate' and 'archived' units.
    */
   listUnitsSync(filter?: ListFilter): MemoryUnit[] {
     if (!this.loaded) return [];
     const results: MemoryUnit[] = [];
 
     for (const unit of this.cache.values()) {
+      // Skip candidate units (not yet confirmed) unless explicitly included
+      if (unit.meta.status === 'candidate' && !filter?.includeCandidate) continue;
       if (!filter?.type || unit.type === filter.type) results.push(unit);
     }
 
@@ -153,6 +157,8 @@ export class FileStore {
     const results: MemoryUnit[] = [];
 
     for (const unit of this.cache.values()) {
+      // Skip candidate units (not yet confirmed) unless explicitly included
+      if (unit.meta.status === 'candidate' && !filter?.includeCandidate) continue;
       if (!filter?.type || unit.type === filter.type) results.push(unit);
     }
 
@@ -277,15 +283,18 @@ export class FileStore {
     this.ensureLoaded();
     const typeDistribution: Record<string, number> = {};
     let active = 0;
+    let candidate = 0;
 
     for (const unit of this.cache.values()) {
       typeDistribution[unit.type] = (typeDistribution[unit.type] || 0) + 1;
       if (unit.meta.status === 'active') active++;
+      if (unit.meta.status === 'candidate') candidate++;
     }
 
     return {
       totalUnits: this.cache.size,
       activeUnits: active,
+      candidateUnits: candidate,
       archivedUnits: this.archiveCache.size,
       typeDistribution,
     };

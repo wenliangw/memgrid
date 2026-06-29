@@ -117,8 +117,8 @@ describe('LearnEngine', () => {
     const applied = await engine.apply(result, 0.5); // lower threshold to accept auto-generated
     expect(applied.length).toBeGreaterThan(0);
 
-    // Verify unit was saved
-    const units = await store.listUnits();
+    // Verify unit was saved (v0.8: default candidate, need includeCandidate)
+    const units = await store.listUnits({ includeCandidate: true });
     expect(units.some((u) => u.type === 'error_solution')).toBe(true);
   });
 });

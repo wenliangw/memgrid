@@ -31,6 +31,14 @@ export interface Association {
   weight: number; // 0.0 ~ 1.0
 }
 
+/** Provenance chain: who created this memory and based on what */
+export interface Provenance {
+  createdBy: string; // "scanner:typescript" | "ai:claude" | "user:7c"
+  basedOnTask?: string; // task summary that produced this memory
+  evidenceUnits?: string[]; // IDs of units used as evidence
+  timestamp: string;
+}
+
 export interface MemoryUnit {
   id: string;
   type: MemoryUnitType;
@@ -56,8 +64,10 @@ export interface MemoryUnit {
     updated: string;
     confidence: number; // 0.0 ~ 1.0
     usage_count: number;
-    status: 'active' | 'stale' | 'archived';
+    status: 'active' | 'stale' | 'archived' | 'candidate';
   };
+  /** Who created this memory and based on what (v0.8+) */
+  provenance?: Provenance;
 }
 
 /** SHA-256 hash of each scanned source file, keyed by relative path */
@@ -97,8 +107,10 @@ export interface SyncResult {
   detectedPatterns: SyncPattern[];
   /** Architecture alerts triggered by changes */
   alerts: SyncAlert[];
-  /** Auto-created memory units from learning engine */
+  /** Auto-created memory units from learning engine (high-confidence, auto-active) */
   autoLearnedUnits: number;
+  /** Candidate units created (need review before searchable) */
+  candidateUnitsCreated: number;
   /** Total time in ms */
   elapsedMs: number;
 }
