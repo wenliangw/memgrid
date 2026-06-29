@@ -135,12 +135,23 @@ program
         console.log('  → Restart OpenClaw Gateway to activate');
 
         // Auto-register MemGrid MCP in OpenClaw Gateway config
-        // OpenClaw workspace is typically ~/.openclaw/workspace-*
+        // root is the working directory — could be ~/.openclaw/ or a workspace-* subdir
         const rootDir = path.resolve(root);
-        let openclawDir = path.join(rootDir, '..');
-        // If we are inside workspace-*, go up one more level to ~/.openclaw/
-        if (path.basename(openclawDir).startsWith('workspace-')) {
-          openclawDir = path.join(openclawDir, '..');
+        let openclawDir = rootDir;
+        // If inside workspace-* or sessions/ etc, go to ~/.openclaw/
+        if (
+          path.basename(openclawDir).startsWith('workspace-') ||
+          !fs.existsSync(path.join(openclawDir, 'openclaw.json'))
+        ) {
+          // Try parent, and keep going until we find openclaw.json or root
+          let dir = rootDir;
+          while (dir !== path.dirname(dir)) {
+            if (fs.existsSync(path.join(dir, 'openclaw.json'))) {
+              openclawDir = dir;
+              break;
+            }
+            dir = path.dirname(dir);
+          }
         }
         const openclawJsonPath = path.join(openclawDir, 'openclaw.json');
         registerOpenClawMcp(openclawJsonPath);
