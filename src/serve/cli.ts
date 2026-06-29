@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import * as fs from 'fs';
+import * as path from 'path';
 import { MemGrid } from '../memgrid.js';
 import {
   TypeScriptScanner,
@@ -14,6 +16,7 @@ import {
 import { startMCPServer } from './mcp-server.js';
 import { injectHooks } from '../hooks.js';
 import { parseMemoryInput, createMemoryUnit } from '../learn/nlp.js';
+import { DomainManager } from '../domain/domain-manager.js';
 
 const program = new Command();
 
@@ -24,13 +27,126 @@ program
 
 program
   .command('init')
-  .description('Scan project and generate initial memory grid')
+  .description('Initialize MemGrid — user grid, project domain, or server mode')
+  .option('-d, --domain <name>', 'Domain name (auto-detected from project if omitted)')
+  .option(
+    '-t, --type <type>',
+    'Domain type: project, server, toolkit, personality, agent-session, gateway, custom',
+  )
   .option('-f, --force', 'Force re-scan even if grid exists')
   .option('--no-rules', 'Skip scanning .claude/rules/')
   .option('--no-examples', 'Skip scanning .claude/examples/')
+  .option('--server', 'Initialize in OpenClaw server mode')
+  .option('--openclaw', 'Generate OpenClaw Gateway config')
   .action(async (options) => {
-    // Auto-detect applicable scanners
     const root = process.cwd();
+    const dm = new DomainManager();
+
+    // === Mode 3: OpenClaw Server ===
+    if (options.server) {
+      console.log('🖥️  MemGrid — OpenClaw Server Mode\n');
+
+      // Init user grid
+      const gridResult = dm.initUserGrid();
+      console.log(gridResult.created ? '🧠 User grid created' : '🧠 User grid already exists');
+      console.log(`   ${dm.gridDir}\n`);
+
+      // Create personality domain
+      const personalityPath = path.join(dm.gridDir, 'personality');
+      if (!fs.existsSync(personalityPath)) fs.mkdirSync(personalityPath, { recursive: true });
+
+      // Create session domains for known agents
+      const agents = ['糖豆', '小明', '晚晚'];
+      for (const agent of agents) {
+        const sessionPath = path.join(dm.gridDir, 'sessions', agent);
+        fs.mkdirSync(sessionPath, { recursive: true });
+
+        // Init MemGrid domain
+        const mg = new MemGrid(sessionPath);
+        await mg.init({
+          projectRoot: sessionPath,
+          includeRules: false,
+          includeExamples: false,
+          force: options.force || false,
+        });
+
+        dm.registerDomain({
+          name: agent,
+          type: 'agent-session',
+          path: sessionPath,
+          description: `${agent} conversation memory domain`,
+          enabled: true,
+        });
+        console.log(`  ✅ ${agent} session domain`);
+      }
+
+      // Generate OpenClaw Gateway config
+      if (options.openclaw) {
+        const configPath = path.join(dm.gridDir, 'openclaw-config.json');
+        const config = {
+          memoryProvider: 'memgrid',
+          enabled: true,
+          gridPath: dm.gridDir,
+          domains: {
+            糖豆: { type: 'agent-session', enabled: true },
+            小明: { type: 'agent-session', enabled: true },
+            晚晚: { type: 'agent-session', enabled: true },
+          },
+          autoSync: true,
+          reviewGate: true,
+        };
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+        console.log(`  ✅ OpenClaw config: ${configPath}`);
+        console.log('  → Restart OpenClaw Gateway to activate');
+      }
+
+      console.log('\n✅ Server initialization complete.');
+      return;
+    }
+
+    // === Mode 1: User Grid Init (not in a project) ===
+    const isProject =
+      fs.existsSync(path.join(root, 'package.json')) ||
+      fs.existsSync(path.join(root, 'pyproject.toml')) ||
+      fs.existsSync(path.join(root, 'go.mod')) ||
+      fs.existsSync(path.join(root, 'Cargo.toml')) ||
+      options.domain;
+
+    if (!isProject) {
+      const gridResult = dm.initUserGrid();
+      if (!gridResult.created) {
+        console.log('🧠 User grid already exists at', gridResult.path);
+        console.log('   Use --force to reinitialize, or cd to a project and run memgrid init');
+        return;
+      }
+
+      console.log('🧠 MemGrid v1.0\n');
+      console.log('   ~/.memgrid/           ← Your cognitive grid');
+      console.log('     mesh.json            ← Grid map');
+      console.log('     personality/         ← Your master personality domain');
+      console.log('     sessions/            ← Agent conversation domains');
+      console.log('');
+      console.log('✅ User grid initialized.');
+      console.log('   Next: cd to a project and run memgrid init');
+      console.log('   Example: cd ~/septonir && memgrid init');
+      return;
+    }
+
+    // === Mode 2: Project Domain Init ===
+    const domainName = options.domain || DomainManager.detectDomainName(root);
+    const domainType = options.type || DomainManager.detectDomainType(root) || 'project';
+    const domainPath = path.join(root, '.memgrid');
+
+    console.log(`📦 Project domain: ${domainName} (${domainType})`);
+    console.log(`   ${domainPath}\n`);
+
+    // Create domain directory structure
+    fs.mkdirSync(domainPath, { recursive: true });
+    fs.mkdirSync(path.join(domainPath, 'units'), { recursive: true });
+    fs.mkdirSync(path.join(domainPath, 'personal'), { recursive: true });
+    fs.mkdirSync(path.join(domainPath, 'index'), { recursive: true });
+
+    // Auto-detect scanners
     const languageScanners = [
       { name: 'typescript', factory: () => new TypeScriptScanner(null as any, root) },
       { name: 'javascript', factory: () => new JavaScriptScanner(null as any, root) },
@@ -43,8 +159,6 @@ program
     for (const ls of languageScanners) {
       if (ls.factory().detect(root)) detected.push(ls.name);
     }
-
-    // Also detect universal scanners
     if (new MarkdownScanner(root).detect(root)) detected.push('markdown');
     if (options.rules !== false && new RulesScanner(root).detect(root)) detected.push('rules');
     if (new ConfigScanner(root).detect(root)) detected.push('config');
@@ -53,34 +167,80 @@ program
     console.log(`🔍 Scanning project (${detected.join(', ') || 'typescript'})...\n`);
 
     await mg.init({
-      projectRoot: process.cwd(),
+      projectRoot: root,
       includeRules: options.rules !== false,
       includeExamples: options.examples !== false,
       force: options.force || false,
     });
 
     const stats = await mg.stats();
-    console.log('📊 MemGrid initialized!\n');
+    console.log('📊 Scan complete!\n');
     console.log('Units generated:');
     for (const [type, count] of Object.entries(stats.typeDistribution)) {
       console.log(`  ${type}: ${count}`);
     }
-    console.log(`\nTotal: ${stats.totalUnits} units`);
-    console.log(`Storage: .claude/memory-grid/`);
+    console.log(`\n  Total: ${stats.totalUnits} units`);
+    console.log(`  Storage: .memgrid/`);
 
-    // Auto-configure memory sync hooks
+    // Auto-configure gitignore
+    const gitignore = path.join(root, '.gitignore');
+    const personalIgnore = '.memgrid/personal/';
+    let needsGitignore = true;
+    if (fs.existsSync(gitignore)) {
+      const content = fs.readFileSync(gitignore, 'utf-8');
+      needsGitignore = !content.includes(personalIgnore);
+    }
+    if (needsGitignore) {
+      fs.appendFileSync(
+        gitignore,
+        `\n# MemGrid personal memory (not shared)\n${personalIgnore}\n`,
+        'utf-8',
+      );
+      console.log('\n📝 .gitignore: personal memory excluded');
+    }
+
+    // Auto-configure Claude Code
+    const claudeSettingsDir = path.join(root, '.claude');
+    fs.mkdirSync(claudeSettingsDir, { recursive: true });
+
+    // MCP + Hook via settings.json
     const hookResult = injectHooks(root);
     if (hookResult.actions.length > 0) {
-      console.log('\n🔗 Auto-sync hooks:');
+      console.log('\n🔗 Claude Code integration:');
       if (hookResult.actions.includes('claude-post-completion')) {
         const status = hookResult.details.claudeSettings === 'created' ? 'created' : 'merged';
-        console.log(`  .claude/settings.json: ${status} PostCompletion hook`);
+        console.log(`  .claude/settings.json: ${status} — auto-sync hooks`);
       }
       if (hookResult.actions.includes('git-post-commit')) {
         console.log('  post-commit hook: created');
       }
-      console.log('\n  ✅ Memory grid will auto-sync on task completion & git commit');
     }
+
+    // Inject CLAUDE.md block
+    injectClaudeMdBlock(root, domainName);
+
+    // Create domain README for other AI tools
+    const readmePath = path.join(domainPath, 'README.md');
+    fs.writeFileSync(readmePath, generateDomainReadme(domainName), 'utf-8');
+    console.log('  .memgrid/README.md: created — guidance for AI tools');
+
+    // Register domain in user grid
+    dm.registerDomain({
+      name: domainName,
+      type: domainType as any,
+      path: domainPath,
+      description: `${domainName} project memory domain`,
+      enabled: true,
+    });
+    console.log(`\n🧠 Domain registered in your cognitive grid (~/.memgrid/)`);
+
+    // Run initial rebalance
+    await mg.rebalance();
+
+    console.log('\n✅ Project domain initialized. Ready.');
+    console.log('   memgrid search "your task"  —  search domain memory');
+    console.log('   memgrid review              —  review candidate memories');
+    console.log('   memgrid stats               —  domain statistics');
   });
 
 program
@@ -426,3 +586,86 @@ program
   });
 
 program.parse();
+
+// ===== Helper Functions =====
+
+/** Inject MemGrid block into CLAUDE.md */
+function injectClaudeMdBlock(projectRoot: string, domainName: string): void {
+  const claudeMdPath = path.join(projectRoot, 'CLAUDE.md');
+  const block = [
+    '',
+    '<!-- MEMGRID:START -->',
+    '',
+    '## 🧠 Project Memory (MemGrid)',
+    '',
+    `This project uses MemGrid for persistent memory. Search before each task to understand the codebase context.`,
+    '',
+    '### How to use',
+    '',
+    '**Before starting a task:**',
+    '```bash',
+    'npx memgrid search "your task description" --max 10',
+    '```',
+    '',
+    '**Or use the MCP tool:** Call `memgrid_search` directly in conversation.',
+    '',
+    '**After completing code changes:**',
+    '```bash',
+    'npx memgrid sync',
+    '```',
+    '',
+    'Memory is stored in `.memgrid/`. It auto-syncs via hooks. Candidate learnings need manual review via `memgrid review`.',
+    '',
+    '<!-- MEMGRID:END -->',
+  ].join('\n');
+
+  if (!fs.existsSync(claudeMdPath)) {
+    // Create new CLAUDE.md with MemGrid block
+    fs.writeFileSync(claudeMdPath, `# ${domainName}\n${block}\n`, 'utf-8');
+    console.log('  CLAUDE.md: created with MemGrid instructions');
+    return;
+  }
+
+  const existing = fs.readFileSync(claudeMdPath, 'utf-8');
+  if (existing.includes('<!-- MEMGRID:START -->')) {
+    console.log('  CLAUDE.md: MemGrid block already exists');
+    return;
+  }
+
+  fs.appendFileSync(claudeMdPath, block + '\n', 'utf-8');
+  console.log('  CLAUDE.md: MemGrid block injected');
+}
+
+/** Generate .memgrid/README.md for AI tool discoverability */
+function generateDomainReadme(domainName: string): string {
+  return [
+    `# ${domainName} — Project Memory Grid`,
+    '',
+    'This directory contains a structured knowledge mesh of this project,',
+    'built by [MemGrid](https://github.com/wenliangw/memgrid).',
+    '',
+    '## For AI agents',
+    '',
+    'Before starting any task, search the memory grid for relevant context:',
+    '',
+    '```bash',
+    '# With MemGrid CLI installed:',
+    'memgrid search "your task" --max 10',
+    '',
+    '# Or manually browse:',
+    'ls .memgrid/units/',
+    'cat .memgrid/units/method_*.json    # API & code structure',
+    'cat .memgrid/units/pattern_*.json   # Design patterns',
+    '```',
+    '',
+    '## Directory structure',
+    '',
+    '- `mesh.json`              — domain metadata',
+    '- `units/`                 — shared knowledge units (code structure, patterns)',
+    '- `personal/`              — personal observations (git-ignored, not shared)',
+    '- `index/`                 — search index',
+    '- `sync.log`               — sync event log',
+    '',
+    'Managed by MemGrid — runs `memgrid sync` to keep current.',
+  ].join('\n');
+}

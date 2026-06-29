@@ -194,3 +194,37 @@ export interface FileScanResult {
   units: MemoryUnit[];
   hash: string;
 }
+
+// ===== Multi-Domain Types (v0.10+) =====
+
+export type DomainType =
+  | 'project'
+  | 'server'
+  | 'toolkit'
+  | 'personality'
+  | 'agent-session'
+  | 'gateway'
+  | 'custom';
+
+export interface MemoryDomain {
+  name: string;
+  type: DomainType;
+  path: string;
+  description?: string;
+  enabled: boolean;
+}
+
+export interface UserGrid {
+  version: string;
+  user: string;
+  createdAt: string;
+  domains: MemoryDomain[];
+  crossDomainAssociations: CrossDomainAssociation[];
+}
+
+export interface CrossDomainAssociation {
+  from: { domain: string; unitId: string };
+  to: { domain: string; unitId: string };
+  relation: string;
+  weight: number;
+}
