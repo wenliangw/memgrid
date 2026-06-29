@@ -48,18 +48,22 @@ export interface MemoryUnit {
   source?: {
     file: string;
     lines?: string;
+    /** Source type: source code, markdown doc, atom, etc. (v0.10+) */
+    type?: 'code' | 'markdown' | 'atom' | 'document';
   };
   signatures: string[];
   content: {
-    description: string;
+    description?: string; // made optional (v0.10+) — use source.file for full content
     inputs?: string;
     outputs?: string;
     dependencies?: string[];
     code_snippet?: string;
     style_notes?: string;
-    trigger?: string; // for trigger types: "when to use"
-    action?: string; // for trigger types: "what to do"
+    trigger?: string;
+    action?: string;
   };
+  /** Search keywords (v0.10+) — lightweight index for retrieval */
+  keywords?: string[];
   associations: Association[];
   meta: {
     created: string;

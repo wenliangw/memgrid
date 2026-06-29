@@ -70,14 +70,19 @@ program
           const sessionPath = path.join(dm.gridDir, 'sessions', agent.name);
           fs.mkdirSync(sessionPath, { recursive: true });
 
+          // Create docs/ directory for structured source documents
+          const docsDir = path.join(sessionPath, 'docs');
+          fs.mkdirSync(docsDir, { recursive: true });
+
+          // Ensure MemGrid storage directories exist
+          const mgDir = path.join(sessionPath, '.memgrid');
+          fs.mkdirSync(path.join(mgDir, 'units'), { recursive: true });
+          fs.mkdirSync(path.join(mgDir, 'archive'), { recursive: true });
+
           // Init MemGrid domain for this agent
           const mg = new MemGrid(sessionPath);
-          await mg.init({
-            projectRoot: sessionPath,
-            includeRules: false,
-            includeExamples: false,
-            force: options.force || false,
-          });
+          mg.store.ensureDirs();
+          mg.store.load();
 
           dm.registerDomain({
             name: agent.name,
@@ -938,7 +943,7 @@ function generateMigrationGuide(gridDir: string): void {
     'Each memory is stored as a JSON file. Use the `memgrid_add` MCP tool',
     'or `memgrid add` CLI to write memories.',
     '',
-    '### Memory unit structure',
+    '### Memory unit structure (v0.10 — lightweight index cards)',
     '',
     '```json',
     '{',

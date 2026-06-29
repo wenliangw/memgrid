@@ -44,10 +44,17 @@ export class RetrieveEngine {
     if (this.index && this.indexBuilt) return;
 
     this.index = new MiniSearch({
-      fields: ['summary', 'signatures', 'content.description', 'content.trigger', 'content.action'],
+      fields: [
+        'summary',
+        'signatures',
+        'keywords',
+        'content.description',
+        'content.trigger',
+        'content.action',
+      ],
       storeFields: ['id'],
       searchOptions: {
-        boost: { summary: 5, signatures: 3 },
+        boost: { summary: 5, keywords: 4, signatures: 3 },
         prefix: true,
         fuzzy: 0.2,
       },
@@ -220,10 +227,14 @@ export class RetrieveEngine {
     for (const unit of result.units) {
       lines.push(`### ${unit.id} (${unit.type})`);
       lines.push(`- **${unit.summary}**`);
-      if (unit.source) {
+      if (unit.source?.file) {
+        const srcType = unit.source.type || 'source';
         lines.push(
-          `- location: \`${unit.source.file}\`${unit.source.lines ? `:${unit.source.lines}` : ''}`,
+          `- 📄 ${srcType}: \`${unit.source.file}\`${unit.source.lines ? `:${unit.source.lines}` : ''}`,
         );
+      }
+      if (unit.keywords && unit.keywords.length > 0) {
+        lines.push(`- 🔑 ${unit.keywords.join(', ')}`);
       }
       if (unit.content.inputs && unit.content.inputs !== 'none') {
         lines.push(`- inputs: ${unit.content.inputs}`);
@@ -231,7 +242,14 @@ export class RetrieveEngine {
       if (unit.content.outputs && unit.content.outputs !== 'void') {
         lines.push(`- outputs: ${unit.content.outputs}`);
       }
-      lines.push(`- ${unit.content.description}`);
+      if (unit.content.description) {
+        lines.push(`- ${unit.content.description.slice(0, 300)}`);
+      }
+      if (unit.provenance) {
+        lines.push(
+          `- from: ${unit.provenance.createdBy} — ${unit.provenance.timestamp?.slice(0, 10) || ''}`,
+        );
+      }
       if (unit.content.style_notes) {
         lines.push(`- style: ${unit.content.style_notes}`);
       }
