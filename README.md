@@ -2,6 +2,12 @@
 
 > Project-level semantic memory for AI coding agents. Replaces full-codebase context loading with a self-evolving knowledge-mesh.
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/memgrid"><img src="https://img.shields.io/npm/v/memgrid?color=blue" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/memgrid"><img src="https://img.shields.io/npm/dm/memgrid?color=green" alt="npm downloads"></a>
+  <a href="https://github.com/wenliangw/memgrid/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/memgrid" alt="license"></a>
+</p>
+
 ## 🧠 What is MemGrid?
 
 MemGrid builds a **memory mesh** of your project — not as flat documents, but as interconnected **knowledge units**. Each unit represents one thing: a method, a component, a design pattern, a bug fix, a coding style preference, or a tooling rule.
@@ -19,6 +25,52 @@ AI coding tools today face a context dilemma:
 - Start fresh every session → no learning, inconsistent style
 
 MemGrid solves this by giving the agent exactly what it needs, nothing it doesn't.
+
+## 🚀 Setup — Just Tell Your AI
+
+You don't need to read CLI docs or copy-paste configs. Your AI agent can set up MemGrid for you.
+
+**Tell your AI agent:**
+
+> Please set up MemGrid for this project — install it, scan the codebase, and configure auto-sync so the memory grid stays up to date.
+
+That's it. Your AI will:
+
+1. Run `npm install -g memgrid` (if not already installed)
+2. Run `memgrid init` to scan your project and build the knowledge mesh
+3. Configure auto-sync hooks so the grid updates after every task
+4. (For MCP hosts) Register the MemGrid MCP server
+
+No manual config editing. No YAML wrangling. Just tell your AI what you want.
+
+> **Prefer to do it yourself?** Classic CLI quick start below.
+
+<details>
+<summary>Manual setup (CLI)</summary>
+
+```bash
+npm install -g memgrid
+
+cd your-project
+memgrid init              # Scan project, build memory mesh
+
+memgrid search "..."      # Search before each task
+memgrid sync              # Sync after each task
+```
+
+</details>
+
+## 🔌 Integration — Claude Code
+
+MemGrid is built for Claude Code. `memgrid init` handles everything automatically:
+
+- **MCP Server** — auto-registered in `claude.json`. Your Claude agent gets `memgrid_search` and `memgrid_suggest` as native tools.
+- **Auto-Sync Hooks** — `PostCompletion` and `PostToolUse` hooks auto-injected into `.claude/settings.json`. Grid stays fresh after every task and every file change.
+- **CLAUDE.md** — add a block to teach your Claude agent to search memory before starting work (see Auto-Sync Hooks section).
+
+All injections are **non-destructive** — existing settings are merged, never overwritten.
+
+> **Using other tools?** MemGrid outputs plain Markdown. Run `memgrid search "your task"` and paste the result into any AI tool's prompt or project instructions. Just be aware that automatic sync (hooks) is currently only available for Claude Code.
 
 ## 📐 Architecture
 
@@ -50,86 +102,6 @@ MemGrid solves this by giving the agent exactly what it needs, nothing it doesn'
 └─────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
-
-```bash
-npm install -g memgrid
-# or
-pnpm add -g memgrid
-```
-
-### Initialize
-
-```bash
-cd your-project
-memgrid init
-```
-
-MemGrid auto-detects your project's languages and scans all relevant source files.
-
-**Supported languages:** TypeScript, JavaScript, Python, Go, Rust, and any Markdown documentation.
-
-```bash
-# Example output for a TypeScript + Markdown + Rules project:
-# 🔍 Scanning project (typescript, markdown, rules, config)...
-```
-
-The grid is stored in `.claude/memory-grid/`.
-
-### Search
-
-```bash
-# Hybrid search (keyword + semantic, configurable weight)
-memgrid search "add file upload to creation endpoint"
-
-# With options
-memgrid search "error handling pattern" --semantic 0.6 --max 5 --hops 2
-```
-
-### Incremental Sync
-
-Fast sync after code changes — only re-scans changed files:
-
-```bash
-memgrid sync
-# Output:
-# 📁 Changed files:  3
-# 🗑️  Removed files:  0
-# 📝 Updated units:  12
-# ⚠️  Stale units:    0
-# 🔗 Repaired links: 2
-# ⏱️  Done in 1834ms
-```
-
-### Add Custom Units
-
-```bash
-memgrid add \
-  --type decision \
-  --summary "Why we chose PostgreSQL over MongoDB" \
-  --description "ACID compliance for financial data, team expertise, $REASON" \
-  --file docs/decisions/database.md
-```
-
-### Stats
-
-```bash
-memgrid stats
-# 📊 MemGrid Statistics
-#   Total units:    150
-#   Active:         142
-#   Archived:       8
-#   Last scan:      2026-06-28T10:00:00.000Z
-```
-
-### MCP Server
-
-```bash
-memgrid serve
-```
-
-Exposes MemGrid as an MCP tool — plug into Claude Desktop, VS Code, or any MCP-compatible agent.
-
 ## 📦 Memory Unit Types
 
 | Type | What it stores | Example |
@@ -145,6 +117,42 @@ Exposes MemGrid as an MCP tool — plug into Claude Desktop, VS Code, or any MCP
 | `rule_trigger` | When to load which rule | "Server code → load coding-philosophy" |
 | `style_preference` | Your coding style | "functional pipes over for-loops" |
 | `architecture_principle` | Architecture red lines | "Controller never calls Repository directly" |
+
+## 🔄 Auto-Sync Hooks
+
+`memgrid init` configures hooks to keep the grid current without manual effort:
+
+| Hook | Trigger | What it does |
+|------|---------|--------------|
+| **PostCompletion** | Agent finishes a task | Runs `memgrid sync` |
+| **PostToolUse** | File write/edit tools | Runs `memgrid sync` |
+
+Incremental sync: only re-scans changed files (hash-diff), repairs broken associations (fuzzy match), and auto-learns new patterns. All injections are **non-destructive** — existing config is merged, never overwritten.
+
+## 🌐 Language Support
+
+MemGrid is **language-agnostic** at its core. Scanners are swappable plugins:
+
+| Scanner | Detects | Extracts |
+|---------|---------|----------|
+| **TypeScript** | `tsconfig.json`, `.ts` files | Classes, methods, exported functions (AST via ts-morph) |
+| **JavaScript** | `package.json` (no tsconfig), `.js` files | Exported functions, classes, arrow functions (regex) |
+| **Python** | `pyproject.toml`, `.py` files | Functions, classes, decorators, docstrings (regex) |
+| **Go** | `go.mod`, `.go` files | Functions, methods, structs, interfaces (regex) |
+| **Rust** | `Cargo.toml`, `.rs` files | Functions, structs, enums, traits, impl blocks (regex) |
+| **Markdown** | Any `.md` files | Headings as knowledge units |
+| **Rules** | `.claude/rules/*.md` | Design patterns, coding rules, trigger units |
+| **Config** | `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `docker-compose.yml` | Tech stack, dependencies, infrastructure |
+
+**Adding a new language** means implementing the `Scanner` interface — the core engine stays untouched:
+
+```typescript
+export class PythonScanner implements Scanner {
+  readonly name = 'python';
+  detect(projectRoot: string): boolean { ... }
+  async scan(options: ScanOptions): Promise<MemoryUnit[]> { ... }
+}
+```
 
 ## 🆚 vs Alternatives
 
@@ -163,10 +171,12 @@ Exposes MemGrid as an MCP tool — plug into Claude Desktop, VS Code, or any MCP
 | Scenario | Time |
 |----------|------|
 | Search (keyword) | < 3ms |
-| Search (repeated, LRU) | 0ms |
+| Search (repeated, LRU cache) | 0ms |
 | Sync (0 changes) | ~5ms |
 | Sync (1 file changed) | ~2s |
 | Full init (150 units) | ~10s |
+
+Token consumption reduced **~40%** vs full-codebase context (67K → ~55K total, top-10 from 10K → ~6K).
 
 ## 📁 File Format
 
@@ -204,80 +214,23 @@ Memory units are stored as JSON in `.claude/memory-grid/units/` — **Git-friend
 }
 ```
 
-`mesh.json` stores the grid metadata including `fileSnapshot` for incremental sync and `edgeIndex` for fast association traversal.
+## 💬 Feedback
 
-## 🌐 Language Support
+This project is in its early days. We'd love to hear about your experience — what works, what doesn't, what you wish it could do.
 
-MemGrid is **language-agnostic** at its core. Scanners are swappable plugins:
+👉 [github.com/wenliangw/memgrid/issues](https://github.com/wenliangw/memgrid/issues)
 
-| Scanner | Detects | Extracts |
-|---------|---------|----------|
-| **TypeScript** | `tsconfig.json`, `.ts` files | Classes, methods, exported functions (AST via ts-morph) |
-| **JavaScript** | `package.json` (no tsconfig), `.js` files | Exported functions, classes, arrow functions (regex) |
-| **Python** | `pyproject.toml`, `.py` files | Functions, classes, decorators, docstrings (regex) |
-| **Go** | `go.mod`, `.go` files | Functions, methods, structs, interfaces (regex) |
-| **Rust** | `Cargo.toml`, `.rs` files | Functions, structs, enums, traits, impl blocks (regex) |
-| **Markdown** | Any `.md` files | Headings as knowledge units |
-| **Rules** | `.claude/rules/*.md` | Design patterns, coding rules, trigger units |
-| **Config** | `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `docker-compose.yml` | Tech stack, dependencies, infrastructure |
-
-**Adding a new language** means implementing the `Scanner` interface — the core engine (storage, retrieval, learning, sync) stays untouched.
-
-```typescript
-// src/scanner/python.ts (example)
-export class PythonScanner implements Scanner {
-  readonly name = 'python';
-  detect(projectRoot: string): boolean { ... }
-  async scan(options: ScanOptions): Promise<MemoryUnit[]> { ... }
-}
-```
-
-## 🔌 Integration
-
-MemGrid outputs **standardized Markdown context** consumable by any AI coding tool:
-
-- **Claude Code** — via MCP Server or Hook
-- **Cursor / Windsurf** — via Rules file injection
-- **GitHub Copilot** — via `.github/copilot-instructions.md`
-- **Aider / Cline / Continue** — via custom prompt templates
+## 📝 CLI Reference
 
 ```bash
-# Start MCP Server
-memgrid serve
+memgrid init                          # Initialize memory grid
+memgrid search <query> [--max N] [--hops N] [--semantic 0.5]   # Search
+memgrid sync                          # Incremental sync
+memgrid add --type decision --summary "..." --description "..."  # Add custom unit
+memgrid learn [--description "..."]   # NLP natural-language learning
+memgrid stats                         # Grid statistics
+memgrid serve                         # Start MCP server
 ```
-
-## 🔄 Auto-Sync Hooks
-
-`memgrid init` automatically configures hooks so your memory grid stays up to date without manual effort:
-
-| Hook | Trigger | What it does |
-|------|---------|--------------|
-| **PostCompletion** | Claude Code finishes a task | Runs `memgrid sync` automatically |
-| **post-commit** | `git commit` | Runs `memgrid sync` (covers non-Claude changes) |
-
-All injections are **non-destructive** — existing config is merged, never overwritten.
-
-## 📝 CLAUDE.md Integration (optional)
-
-To make your AI agent proactive about memory, add these sections to your CLAUDE.md:
-
-```markdown
-## MemGrid
-
-Before any task, search the memory grid for relevant context:
-
-```bash
-npx memgrid search "<what you're about to do>" --max 10
-```
-
-After completing code changes, sync the grid back:
-
-```bash
-npx memgrid sync
-```
-```
-
-> ⚠️ MemGrid won't touch your CLAUDE.md. The hooks above handle automatic sync. This snippet is just a recommendation — add it if you want your AI agent to actively *search* the grid before starting.
 
 ## License
 
