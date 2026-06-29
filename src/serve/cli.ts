@@ -45,7 +45,7 @@ program
 
     // === Mode 3: OpenClaw Server ===
     if (options.server) {
-      console.log('🖥️  MemGrid — OpenClaw Server Mode\n');
+      console.log('🖥️  OpenClaw Server — MemGrid — OpenClaw Server Mode\n');
 
       // Init user grid
       const gridResult = dm.initUserGrid();
@@ -61,7 +61,9 @@ program
       const configDomains: Record<string, Record<string, unknown>> = {};
 
       if (agents.length === 0) {
-        console.log('  ⚠️  No agents detected. Use --openclaw-path <path> or create session domains manually.');
+        console.log(
+          '  ⚠️  No agents detected. Use --openclaw-path <path> or create session domains manually.',
+        );
         console.log('     Example: memgrid init --server --domain my-agent');
       } else {
         for (const agent of agents) {
@@ -87,22 +89,34 @@ program
 
           // Store agent metadata in session domain
           const agentMetaPath = path.join(sessionPath, 'agent.json');
-          fs.writeFileSync(agentMetaPath, JSON.stringify({
-            name: agent.name,
-            description: agent.description || '',
-            purpose: agent.purpose || '',
-            type: 'agent-session',
-            createdAt: new Date().toISOString(),
-          }, null, 2), 'utf-8');
+          fs.writeFileSync(
+            agentMetaPath,
+            JSON.stringify(
+              {
+                name: agent.name,
+                description: agent.description || '',
+                purpose: agent.purpose || '',
+                type: 'agent-session',
+                createdAt: new Date().toISOString(),
+              },
+              null,
+              2,
+            ),
+            'utf-8',
+          );
 
           configDomains[agent.name] = { type: 'agent-session', enabled: true };
-          console.log(`  ✅ ${agent.name} session domain (${agent.purpose || 'no purpose configured'})`);
+          console.log(
+            `  ✅ ${agent.name} session domain (${agent.purpose || 'no purpose configured'})`,
+          );
         }
 
         // Generate global migration guide
         generateMigrationGuide(dm.gridDir);
         console.log(`\n  📋 Migration guide: ~/.memgrid/MIGRATION.md`);
-        console.log(`     → Tell your agent: "Please read MIGRATION.md and migrate existing memories into MemGrid"`);
+        console.log(
+          `     → Tell your agent: "Please read MIGRATION.md and migrate existing memories into MemGrid"`,
+        );
       }
 
       // Generate OpenClaw Gateway config
@@ -577,7 +591,11 @@ program
 
     if (options.unregister) {
       const ok = dm.unregisterDomain(options.unregister);
-      console.log(ok ? `🗑️  Domain removed: ${options.unregister}` : `❌ Domain not found: ${options.unregister}`);
+      console.log(
+        ok
+          ? `🗑️  Domain removed: ${options.unregister}`
+          : `❌ Domain not found: ${options.unregister}`,
+      );
       return;
     }
 
@@ -808,7 +826,9 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
             purpose: match[1].trim(),
           });
         }
-      } catch { /* ignore yaml parse errors */ }
+      } catch {
+        /* ignore yaml parse errors */
+      }
     }
   }
 
@@ -834,7 +854,9 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
             purpose: dir.replace('workspace-', ''),
             workspaceDir: fullWorkspacePath,
           });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     }
   }
@@ -855,7 +877,9 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
                 description: meta.description,
                 purpose: meta.purpose,
               });
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           }
         }
       }
