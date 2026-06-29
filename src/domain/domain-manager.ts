@@ -124,6 +124,27 @@ export class DomainManager {
 
   // ===== Domain Detection =====
 
+  /** Detect OpenClaw agent workspaces in a directory */
+  detectOpenClawWorkspaces(dir: string): string[] {
+    const workspaces: string[] = [];
+    if (!fs.existsSync(dir)) return workspaces;
+
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      if (!entry.name.startsWith('workspace-')) continue;
+
+      const fullPath = path.join(dir, entry.name);
+      // Check for IDENTITY.md or SOUL.md as agent signal
+      if (
+        fs.existsSync(path.join(fullPath, 'IDENTITY.md')) ||
+        fs.existsSync(path.join(fullPath, 'SOUL.md'))
+      ) {
+        workspaces.push(fullPath);
+      }
+    }
+    return workspaces;
+  }
+
   /** Detect domain name from project directory */
   static detectDomainName(projectRoot: string): string {
     // Priority: package.json > pyproject.toml > go.mod > Cargo.toml > directory name

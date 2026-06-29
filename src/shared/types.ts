@@ -33,7 +33,7 @@ export interface Association {
 
 /** Provenance chain: who created this memory and based on what */
 export interface Provenance {
-  createdBy: string; // "scanner:typescript" | "ai:claude" | "user:7c"
+  createdBy: string; // "scanner:typescript" | "ai:claude" | "user"
   basedOnTask?: string; // task summary that produced this memory
   evidenceUnits?: string[]; // IDs of units used as evidence
   timestamp: string;

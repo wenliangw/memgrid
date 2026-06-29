@@ -97,6 +97,21 @@ program
 
           configDomains[agent.name] = { type: 'agent-session', enabled: true };
           console.log(`  ✅ ${agent.name} session domain (${agent.purpose || 'no purpose configured'})`);
+
+          // Migrate existing OpenClaw atom memory to MemGrid
+          const workspaceDir = path.join(root, agent.workspaceDir || '');
+          if (fs.existsSync(path.join(workspaceDir, 'memory', 'atoms'))) {
+            const { migrateAgentAtoms } = await import('../domain/migrate-openclaw.js');
+            const migration = migrateAgentAtoms(workspaceDir, mg.store, agent.name);
+            if (migration.filesScanned > 0) {
+              console.log(`     📋 Migration: ${migration.filesScanned} atom files → ${migration.unitsCreated} memory units`);
+              if (migration.errors > 0) {
+                console.log(`     ⚠️  ${migration.errors} atom(s) failed to convert`);
+              }
+              // Re-scan associations
+              await mg.rebalance();
+            }
+          }
         }
       }
 
@@ -777,6 +792,7 @@ interface DetectedAgent {
   name: string;
   description?: string;
   purpose?: string;
+  workspaceDir?: string;
 }
 
 function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
@@ -814,7 +830,8 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
     });
 
     for (const dir of workspaceDirs) {
-      const identityPath = path.join(projectRoot, dir, 'IDENTITY.md');
+      const fullWorkspacePath = path.join(projectRoot, dir);
+      const identityPath = path.join(fullWorkspacePath, 'IDENTITY.md');
       if (fs.existsSync(identityPath)) {
         try {
           const content = fs.readFileSync(identityPath, 'utf-8');
@@ -825,6 +842,7 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
             name: nameMatch ? nameMatch[1].trim() : dir.replace('workspace-', ''),
             description: purposeMatch ? purposeMatch[0] : '',
             purpose: dir.replace('workspace-', ''),
+            workspaceDir: fullWorkspacePath,
           });
         } catch { /* ignore */ }
       }
