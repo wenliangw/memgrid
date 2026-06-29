@@ -56,29 +56,48 @@ program
       const personalityPath = path.join(dm.gridDir, 'personality');
       if (!fs.existsSync(personalityPath)) fs.mkdirSync(personalityPath, { recursive: true });
 
-      // Create session domains for known agents
-      const agents = ['糖豆', '小明', '晚晚'];
-      for (const agent of agents) {
-        const sessionPath = path.join(dm.gridDir, 'sessions', agent);
-        fs.mkdirSync(sessionPath, { recursive: true });
+      // Create session domains for agents detected from OpenClaw config
+      const agents = detectOpenClawAgents(root);
+      const configDomains: Record<string, Record<string, unknown>> = {};
 
-        // Init MemGrid domain
-        const mg = new MemGrid(sessionPath);
-        await mg.init({
-          projectRoot: sessionPath,
-          includeRules: false,
-          includeExamples: false,
-          force: options.force || false,
-        });
+      if (agents.length === 0) {
+        console.log('  ⚠️  No agents detected. Use --openclaw-path <path> or create session domains manually.');
+        console.log('     Example: memgrid init --server --domain my-agent');
+      } else {
+        for (const agent of agents) {
+          const sessionPath = path.join(dm.gridDir, 'sessions', agent.name);
+          fs.mkdirSync(sessionPath, { recursive: true });
 
-        dm.registerDomain({
-          name: agent,
-          type: 'agent-session',
-          path: sessionPath,
-          description: `${agent} conversation memory domain`,
-          enabled: true,
-        });
-        console.log(`  ✅ ${agent} session domain`);
+          // Init MemGrid domain for this agent
+          const mg = new MemGrid(sessionPath);
+          await mg.init({
+            projectRoot: sessionPath,
+            includeRules: false,
+            includeExamples: false,
+            force: options.force || false,
+          });
+
+          dm.registerDomain({
+            name: agent.name,
+            type: 'agent-session',
+            path: sessionPath,
+            description: agent.description || `${agent.name} conversation memory domain`,
+            enabled: true,
+          });
+
+          // Store agent metadata in session domain
+          const agentMetaPath = path.join(sessionPath, 'agent.json');
+          fs.writeFileSync(agentMetaPath, JSON.stringify({
+            name: agent.name,
+            description: agent.description || '',
+            purpose: agent.purpose || '',
+            type: 'agent-session',
+            createdAt: new Date().toISOString(),
+          }, null, 2), 'utf-8');
+
+          configDomains[agent.name] = { type: 'agent-session', enabled: true };
+          console.log(`  ✅ ${agent.name} session domain (${agent.purpose || 'no purpose configured'})`);
+        }
       }
 
       // Generate OpenClaw Gateway config
@@ -88,11 +107,7 @@ program
           memoryProvider: 'memgrid',
           enabled: true,
           gridPath: dm.gridDir,
-          domains: {
-            糖豆: { type: 'agent-session', enabled: true },
-            小明: { type: 'agent-session', enabled: true },
-            晚晚: { type: 'agent-session', enabled: true },
-          },
+          domains: configDomains,
           autoSync: true,
           reviewGate: true,
         };
@@ -755,4 +770,89 @@ function registerGlobalMcp(_gridDir: string): void {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
     console.log('  📎 ~/.claude/settings.json: MCP created\n');
   }
+}
+
+/** Detect OpenClaw agents from agents.yaml or workspace-agent directories */
+interface DetectedAgent {
+  name: string;
+  description?: string;
+  purpose?: string;
+}
+
+function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
+  const agents: DetectedAgent[] = [];
+
+  // Method 1: Read from agents.yaml if present
+  const yamlPaths = [
+    path.join(projectRoot, 'agents.yaml'),
+    path.join(projectRoot, 'config', 'agents.yaml'),
+  ];
+
+  for (const yamlPath of yamlPaths) {
+    if (fs.existsSync(yamlPath)) {
+      try {
+        const content = fs.readFileSync(yamlPath, 'utf-8');
+        // Simple YAML parsing: match agent blocks
+        const agentPattern = /^\s*(\w[\w-]*):\s*$\s*^\s*name:\s*(.+)$\s*^\s*description:\s*(.+)$/gm;
+        let match;
+        while ((match = agentPattern.exec(content)) !== null) {
+          agents.push({
+            name: match[2].trim().replace(/"/g, ''),
+            description: match[3].trim().replace(/"/g, ''),
+            purpose: match[1].trim(),
+          });
+        }
+      } catch { /* ignore yaml parse errors */ }
+    }
+  }
+
+  // Method 2: Scan workspace-* directories for agent identity files
+  if (agents.length === 0) {
+    const workspaceDirs = fs.readdirSync(projectRoot).filter((d) => {
+      const full = path.join(projectRoot, d);
+      return fs.statSync(full).isDirectory() && d.startsWith('workspace-');
+    });
+
+    for (const dir of workspaceDirs) {
+      const identityPath = path.join(projectRoot, dir, 'IDENTITY.md');
+      if (fs.existsSync(identityPath)) {
+        try {
+          const content = fs.readFileSync(identityPath, 'utf-8');
+          // Extract name and description from IDENTITY.md
+          const nameMatch = content.match(/Name:\*\*\s*(.+)/);
+          const purposeMatch = content.match(/I (am|help|manage|handle|do|provide)([^.]+)/i);
+          agents.push({
+            name: nameMatch ? nameMatch[1].trim() : dir.replace('workspace-', ''),
+            description: purposeMatch ? purposeMatch[0] : '',
+            purpose: dir.replace('workspace-', ''),
+          });
+        } catch { /* ignore */ }
+      }
+    }
+  }
+
+  // Method 3: Fallback — scan .memgrid/sessions/ for already-initialized agent domains
+  if (agents.length === 0) {
+    const sessionsPath = path.join(projectRoot, '.memgrid', 'sessions');
+    if (fs.existsSync(sessionsPath)) {
+      for (const entry of fs.readdirSync(sessionsPath)) {
+        const agentPath = path.join(sessionsPath, entry);
+        if (fs.statSync(agentPath).isDirectory()) {
+          const agentMetaPath = path.join(agentPath, 'agent.json');
+          if (fs.existsSync(agentMetaPath)) {
+            try {
+              const meta = JSON.parse(fs.readFileSync(agentMetaPath, 'utf-8'));
+              agents.push({
+                name: meta.name || entry,
+                description: meta.description,
+                purpose: meta.purpose,
+              });
+            } catch { /* ignore */ }
+          }
+        }
+      }
+    }
+  }
+
+  return agents;
 }
