@@ -70,7 +70,13 @@ export interface MemoryUnit {
   provenance?: Provenance;
 }
 
-/** SHA-256 hash of each scanned source file, keyed by relative path */
+/** A conflict detected between two memory units */
+export interface ConflictResult {
+  unitA: MemoryUnit;
+  unitB: MemoryUnit;
+  overlapScore: number;
+  hasOpposition: boolean;
+}
 export type FileSnapshot = Record<string, string>;
 
 export interface MemoryGrid {

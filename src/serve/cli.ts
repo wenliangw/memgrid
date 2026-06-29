@@ -278,6 +278,35 @@ program
   });
 
 program
+  .command('conflicts')
+  .description(
+    'Detect potentially conflicting memory units (same type, high overlap, opposing meaning)',
+  )
+  .action(async () => {
+    const mg = new MemGrid(process.cwd());
+    const conflicts = mg.detectConflicts();
+
+    if (conflicts.length === 0) {
+      console.log('✅ No conflicting memory units detected.');
+      return;
+    }
+
+    console.log(`⚠️  ${conflicts.length} potential conflict(s) detected:\n`);
+    for (const c of conflicts) {
+      const icon = c.hasOpposition ? '🔴' : '🟡';
+      console.log(`${icon} [${c.unitA.type}] overlap=${c.overlapScore.toFixed(2)}`);
+      console.log(`   A: ${c.unitA.summary.slice(0, 80)}`);
+      console.log(`   B: ${c.unitB.summary.slice(0, 80)}`);
+      if (c.hasOpposition) {
+        console.log(`   ⚠️  These appear to express opposing views.`);
+      }
+      console.log(`   IDs: ${c.unitA.id} | ${c.unitB.id}`);
+      console.log(`   Resolve: memgrid archive <id> to remove one, or keep both if complementary.`);
+      console.log('');
+    }
+  });
+
+program
   .command('stats')
   .description('Show grid statistics')
   .action(async () => {
