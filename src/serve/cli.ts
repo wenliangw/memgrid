@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { MemGrid } from '../memgrid.js';
 import {
   TypeScriptScanner,
@@ -126,9 +127,13 @@ program
       console.log('     personality/         ← Your master personality domain');
       console.log('     sessions/            ← Agent conversation domains');
       console.log('');
+
+      // Register global Claude Code MCP
+      registerGlobalMcp(dm.gridDir);
+
       console.log('✅ User grid initialized.');
       console.log('   Next: cd to a project and run memgrid init');
-      console.log('   Example: cd ~/septonir && memgrid init');
+      console.log('   Example: cd ~/my-project && memgrid init');
       return;
     }
 
@@ -542,6 +547,54 @@ program
   });
 
 program
+  .command('domains')
+  .description('Manage memory domains')
+  .option('-l, --list', 'List all registered domains')
+  .option('-s, --set <name>', 'Set active domain')
+  .option('--unregister <name>', 'Remove a domain from the grid (does not delete files)')
+  .action(async (options) => {
+    const dm = new DomainManager();
+
+    if (options.unregister) {
+      const ok = dm.unregisterDomain(options.unregister);
+      console.log(ok ? `🗑️  Domain removed: ${options.unregister}` : `❌ Domain not found: ${options.unregister}`);
+      return;
+    }
+
+    if (options.list || (!options.set && !options.unregister)) {
+      dm.initUserGrid(); // ensure grid exists
+      const domains = dm.listDomains();
+      if (domains.length === 0) {
+        console.log('No domains registered. Run memgrid init to get started.');
+        return;
+      }
+      console.log('📂 Memory Domains:\n');
+      for (const d of domains) {
+        const icon: Record<string, string> = {
+          personality: '🧠',
+          project: '📦',
+          server: '🖥️',
+          toolkit: '🧰',
+          'agent-session': '💬',
+          gateway: '🔌',
+          custom: '📁',
+        };
+        console.log(`  ${icon[d.type] || '📁'} ${d.name}  [${d.type}]`);
+        console.log(`     ${d.path}`);
+        console.log(`     ${d.enabled ? '✅ enabled' : '⏸️  disabled'}`);
+        if (d.description) console.log(`     ${d.description}`);
+        console.log('');
+      }
+      return;
+    }
+
+    if (options.set) {
+      console.log(`Domain set to: ${options.set}`);
+      console.log('Not yet implemented — use: cd to project directory then memgrid init');
+    }
+  });
+
+program
   .command('stats')
   .description('Show grid statistics')
   .action(async () => {
@@ -668,4 +721,38 @@ function generateDomainReadme(domainName: string): string {
     '',
     'Managed by MemGrid — runs `memgrid sync` to keep current.',
   ].join('\n');
+}
+
+/** Register global MemGrid MCP in ~/.claude/settings.json */
+function registerGlobalMcp(_gridDir: string): void {
+  const settingsDir = path.join(os.homedir(), '.claude');
+  fs.mkdirSync(settingsDir, { recursive: true });
+  const settingsPath = path.join(settingsDir, 'settings.json');
+
+  const mcpEntry: Record<string, unknown> = {
+    memgrid: {
+      command: 'memgrid',
+      args: ['serve'],
+    },
+  };
+
+  if (fs.existsSync(settingsPath)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      if (!existing.mcpServers) existing.mcpServers = {};
+      if (existing.mcpServers.memgrid) {
+        console.log('  📎 ~/.claude/settings.json: MCP already registered\n');
+        return;
+      }
+      existing.mcpServers = { ...existing.mcpServers, ...mcpEntry };
+      fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
+      console.log('  📎 ~/.claude/settings.json: MCP merged\n');
+    } catch {
+      console.log('  ⚠️  Could not parse ~/.claude/settings.json — skipped MCP registration\n');
+    }
+  } else {
+    const settings = { mcpServers: mcpEntry };
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
+    console.log('  📎 ~/.claude/settings.json: MCP created\n');
+  }
 }
