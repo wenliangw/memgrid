@@ -198,13 +198,28 @@ export class MemGrid {
         updated: new Date().toISOString(),
         confidence: unit.meta?.confidence ?? 0.7,
         usage_count: 0,
-        status: 'active',
+        status: unit.meta?.status ?? 'candidate',
       },
+      provenance: unit.provenance,
     };
 
     this.store.ensureDirs();
     this.store.saveUnit(fullUnit);
     return fullUnit;
+  }
+
+  /**
+   * Accept a candidate unit — make it active and searchable.
+   */
+  async acceptCandidate(id: string): Promise<MemoryUnit | null> {
+    const unit = this.store.getUnit(id);
+    if (!unit) return null;
+    if (unit.meta.status !== 'candidate') return null;
+
+    unit.meta.status = 'active';
+    unit.meta.updated = new Date().toISOString();
+    this.store.saveUnit(unit);
+    return unit;
   }
 
   async update(id: string, patch: Partial<MemoryUnit>): Promise<MemoryUnit | null> {
@@ -230,8 +245,11 @@ export class MemGrid {
     return await this.learn.analyze(task);
   }
 
-  async applySuggestions(suggestions: LearningSuggestions): Promise<string[]> {
-    return await this.learn.apply(suggestions);
+  async applySuggestions(
+    suggestions: LearningSuggestions,
+    options?: { status?: 'candidate' | 'active' },
+  ): Promise<string[]> {
+    return await this.learn.apply(suggestions, options);
   }
 
   formatSuggestions(suggestions: LearningSuggestions): string {

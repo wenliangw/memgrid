@@ -7,19 +7,26 @@ import type { SyncPattern, SyncAlert } from '../../shared/types.js';
  *
  * After sync detects code changes, patterns, and architecture alerts,
  * this phase converts that raw data into learning suggestions and
- * auto-applies them to the grid.
+ * writes them as CANDIDATE units (v0.8+).
+ *
+ * Candidate units are NOT searchable until confirmed via `memgrid review`.
+ * Confidence >= threshold + source:fact can bypass review (auto-accept).
  */
 export function generateLearnings(
   store: FileStore,
   changedFiles: string[],
   patterns: SyncPattern[],
   alerts: SyncAlert[],
-): { autoUnitsCreated: number } {
+): { autoUnitsCreated: number; candidateUnitsCreated: number } {
   let autoUnitsCreated = 0;
+  let candidateUnitsCreated = 0;
 
-  // 1. Convert detected patterns into memory units
+  // 1. Convert detected patterns into candidate memory units
   for (const pattern of patterns) {
     if (pattern.confidence < 0.4) continue;
+
+    const now = new Date().toISOString();
+    const isActive = pattern.confidence >= 0.85 && pattern.type !== 'pattern';
 
     const unit: MemoryUnit = {
       id: `auto_${pattern.type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -30,22 +37,29 @@ export function generateLearnings(
       content: { description: pattern.summary },
       associations: [],
       meta: {
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
+        created: now,
+        updated: now,
         confidence: pattern.confidence,
         usage_count: 0,
-        status: pattern.confidence >= 0.6 ? 'active' : 'stale',
+        status: isActive ? 'active' : 'candidate',
+      },
+      provenance: {
+        createdBy: 'ai:sync_learning',
+        basedOnTask: `Auto-detected pattern during sync: ${pattern.summary}`,
+        timestamp: now,
       },
     };
 
     store.ensureDirs();
     store.saveUnit(unit);
-    autoUnitsCreated++;
+    if (isActive) autoUnitsCreated++;
+    else candidateUnitsCreated++;
   }
 
-  // 2. Convert architecture alerts into error_solution units
+  // 2. Convert architecture alerts into candidate error_solution units
   for (const alert of alerts) {
     if (alert.level === 'error') {
+      const now = new Date().toISOString();
       const unit: MemoryUnit = {
         id: `auto_error_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         type: 'error_solution',
@@ -57,17 +71,22 @@ export function generateLearnings(
         },
         associations: [],
         meta: {
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
+          created: now,
+          updated: now,
           confidence: 0.5,
           usage_count: 0,
-          status: 'stale',
+          status: 'candidate',
+        },
+        provenance: {
+          createdBy: 'ai:sync_alert',
+          basedOnTask: `Architecture alert: ${alert.message}`,
+          timestamp: now,
         },
       };
 
       store.ensureDirs();
       store.saveUnit(unit);
-      autoUnitsCreated++;
+      candidateUnitsCreated++;
     }
   }
 
@@ -83,5 +102,5 @@ export function generateLearnings(
     }
   }
 
-  return { autoUnitsCreated };
+  return { autoUnitsCreated, candidateUnitsCreated };
 }

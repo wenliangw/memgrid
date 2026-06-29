@@ -171,12 +171,20 @@ export class LearnEngine {
 
   /**
    * Apply the learning suggestions to the grid.
-   * Only applies units with confidence >= 0.7 by default.
+   * v0.8+: options.status controls whether units are created as 'candidate' or 'active'.
    */
-  async apply(suggestions: LearningSuggestions, minConfidence = 0.7): Promise<string[]> {
+  async apply(
+    suggestions: LearningSuggestions,
+    options?: { status?: 'candidate' | 'active' },
+  ): Promise<string[]> {
+    const defaultStatus = options?.status ?? 'candidate';
     const applied: string[] = [];
 
+    const now = new Date().toISOString();
+
     for (const unit of suggestions.add) {
+      const status = defaultStatus;
+
       const fullUnit: MemoryUnit = {
         id: `auto_${unit.type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         type: unit.type as MemoryUnitType,
@@ -186,23 +194,22 @@ export class LearnEngine {
         source: unit.source,
         associations: [],
         meta: {
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
+          created: now,
+          updated: now,
           confidence: 0.6, // Auto-generated, lower confidence
           usage_count: 0,
-          status: 'active',
+          status: status,
+        },
+        provenance: {
+          createdBy: 'ai:learn_engine',
+          basedOnTask: `Task analysis: ${unit.summary}`,
+          timestamp: now,
         },
       };
 
-      if (fullUnit.meta.confidence >= minConfidence) {
-        this.store.saveUnit(fullUnit);
-        applied.push(`+ ${fullUnit.id}`);
-      } else {
-        // Save anyway but mark as needs-review
-        fullUnit.meta.status = 'stale'; // stale here means "pending human review"
-        this.store.saveUnit(fullUnit);
-        applied.push(`? ${fullUnit.id} (needs review, confidence: ${fullUnit.meta.confidence})`);
-      }
+      this.store.saveUnit(fullUnit);
+      const label = status === 'candidate' ? 'candidate' : 'active';
+      applied.push(`+ ${fullUnit.id} (${label}, confidence: ${fullUnit.meta.confidence})`);
     }
 
     for (const { id, patch } of suggestions.update) {

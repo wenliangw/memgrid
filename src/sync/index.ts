@@ -196,6 +196,7 @@ export class SyncEngine {
         detectedPatterns: [],
         alerts: [],
         autoLearnedUnits: 0,
+        candidateUnitsCreated: 0,
         elapsedMs: Date.now() - t0,
       };
     }
@@ -286,7 +287,12 @@ export class SyncEngine {
     const { alerts } = checkArchitecture(this.projectRoot, changedFiles, unitMap);
 
     // === Phase 9: Learning engine — auto-create units from patterns/alerts ===
-    const { autoUnitsCreated } = generateLearnings(this.store, changedFiles, patterns, alerts);
+    const { autoUnitsCreated, candidateUnitsCreated } = generateLearnings(
+      this.store,
+      changedFiles,
+      patterns,
+      alerts,
+    );
 
     return {
       changedFiles,
@@ -299,6 +305,7 @@ export class SyncEngine {
       detectedPatterns: patterns,
       alerts,
       autoLearnedUnits: autoUnitsCreated,
+      candidateUnitsCreated: candidateUnitsCreated,
       elapsedMs: Date.now() - t0,
     };
   }
