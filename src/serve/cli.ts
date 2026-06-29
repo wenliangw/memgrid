@@ -162,7 +162,10 @@ program
           }
         }
         const openclawJsonPath = path.join(openclawDir, 'openclaw.json');
-        registerOpenClawMcp(openclawJsonPath);
+        // Pass the first agent's session domain as the MCP serve target
+        const firstAgentSessionPath =
+          agents.length > 0 ? path.join(dm.gridDir, 'sessions', agents[0].name) : undefined;
+        registerOpenClawMcp(openclawJsonPath, firstAgentSessionPath);
       }
 
       console.log('\n✅ Server initialization complete.');
@@ -701,9 +704,12 @@ program
 program
   .command('serve')
   .description('Start MCP Server (stdio transport)')
-  .action(async () => {
+  .option('-d, --domain <path>', 'Serve a specific domain directory instead of cwd')
+  .action(async (options) => {
+    const root = options.domain || process.cwd();
     console.error('🚀 MemGrid MCP Server starting...');
-    await startMCPServer(process.cwd());
+    console.error(`   Domain: ${root}`);
+    await startMCPServer(root);
   });
 
 program.parse();
@@ -989,7 +995,7 @@ function generateMigrationGuide(gridDir: string): void {
 }
 
 /** Auto-register MemGrid MCP server in OpenClaw Gateway's openclaw.json */
-function registerOpenClawMcp(configPath: string): void {
+function registerOpenClawMcp(configPath: string, domainPath?: string): void {
   if (!fs.existsSync(configPath)) {
     console.log('  ⚠️  openclaw.json not found — skip MCP registration');
     console.log(
@@ -1008,9 +1014,13 @@ function registerOpenClawMcp(configPath: string): void {
       return;
     }
 
+    const args = ['serve'];
+    if (domainPath) {
+      args.push('--domain', domainPath);
+    }
     config.mcp.servers.memgrid = {
       command: 'memgrid',
-      args: ['serve'],
+      args,
     };
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
