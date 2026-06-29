@@ -133,6 +133,10 @@ program
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
         console.log(`  ✅ OpenClaw config: ${configPath}`);
         console.log('  → Restart OpenClaw Gateway to activate');
+
+        // Auto-register MemGrid MCP in OpenClaw Gateway config
+        const openclawJsonPath = path.join(root, '..', 'openclaw.json');
+        registerOpenClawMcp(openclawJsonPath);
       }
 
       console.log('\n✅ Server initialization complete.');
@@ -956,4 +960,37 @@ function generateMigrationGuide(gridDir: string): void {
 
   const guidePath = path.join(gridDir, 'MIGRATION.md');
   fs.writeFileSync(guidePath, guide.join('\n'), 'utf-8');
+}
+
+/** Auto-register MemGrid MCP server in OpenClaw Gateway's openclaw.json */
+function registerOpenClawMcp(configPath: string): void {
+  if (!fs.existsSync(configPath)) {
+    console.log('  ⚠️  openclaw.json not found — skip MCP registration');
+    console.log(
+      `     Add manually: {"mcp":{"servers":{"memgrid":{"command":"memgrid","args":["serve"]}}}}`,
+    );
+    return;
+  }
+
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    if (!config.mcp) config.mcp = {};
+    if (!config.mcp.servers) config.mcp.servers = {};
+
+    if (config.mcp.servers.memgrid) {
+      console.log('  📎 openclaw.json: MemGrid MCP already registered');
+      return;
+    }
+
+    config.mcp.servers.memgrid = {
+      command: 'memgrid',
+      args: ['serve'],
+    };
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+    console.log('  📎 openclaw.json: MemGrid MCP registered');
+    console.log('     → Restart OpenClaw Gateway to activate MemGrid tools');
+  } catch {
+    console.log('  ⚠️  Could not parse openclaw.json — add MCP manually');
+  }
 }
