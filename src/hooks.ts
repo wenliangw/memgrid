@@ -8,7 +8,7 @@ import * as os from 'os';
  * `memgrid init` calls this to set up automatic memory sync hooks.
  * All injections are non-destructive — existing config is preserved.
  *
- * v0.8+: Sync failures are logged to .claude/memory-grid/sync.log
+ * v0.8+: Sync failures are logged to .memgrid/sync.log
  * instead of being silently swallowed.
  */
 
@@ -40,7 +40,7 @@ export interface InjectResult {
  * Return the sync log path for a project.
  */
 function syncLogPath(projectRoot: string): string {
-  return path.join(projectRoot, '.claude', 'memory-grid', 'sync.log');
+  return path.join(projectRoot, '.memgrid', 'sync.log');
 }
 
 /**
@@ -72,7 +72,7 @@ export function logSyncEvent(
  * Logs start/failure; success is logged by the sync CLI itself (see cli.ts).
  */
 export const SYNC_COMMAND = [
-  'SYNC_LOG=".claude/memory-grid/sync.log"',
+  'SYNC_LOG=".memgrid/sync.log"',
   'mkdir -p "$(dirname "$SYNC_LOG")"',
   'echo "[$(date -Iseconds)] [$(hostname)] SYNC_START" >> "$SYNC_LOG"',
   'if npx memgrid sync --quiet; then',
@@ -118,7 +118,7 @@ export function injectHooks(projectRoot: string): InjectResult {
  * Inject PostCompletion hook into .claude/settings.json.
  * Non-destructive: merges with existing config.
  *
- * v0.8+: Sync command logs to .claude/memory-grid/sync.log — no silent failures.
+ * v0.8+: Sync command logs to .memgrid/sync.log — no silent failures.
  */
 function injectClaudeHook(projectRoot: string): 'created' | 'merged' | 'already_exists' {
   const settingsPath = path.join(projectRoot, '.claude', 'settings.json');
@@ -195,7 +195,7 @@ function injectGitHook(projectRoot: string): 'created' | 'already_exists' | 'not
   const gitHookPath = path.join(projectRoot, '.git', 'hooks', 'post-commit');
 
   const syncCmd =
-    'npx memgrid sync --quiet >> .claude/memory-grid/sync.log 2>&1 || { echo "[$(date -Iseconds)] [$(hostname)] SYNC_FAILURE" >> .claude/memory-grid/sync.log; echo "⚠️  memgrid sync failed — see .claude/memory-grid/sync.log" >&2; }';
+    'npx memgrid sync --quiet >> .memgrid/sync.log 2>&1 || { echo "[$(date -Iseconds)] [$(hostname)] SYNC_FAILURE" >> .memgrid/sync.log; echo "⚠️  memgrid sync failed — see .memgrid/sync.log" >&2; }';
 
   // Check husky first
   if (fs.existsSync(huskyDir)) {
