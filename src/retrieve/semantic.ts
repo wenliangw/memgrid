@@ -36,6 +36,8 @@ export interface SemanticSearchOptions {
   maxHops?: number;
   /** Weight of semantic vs keyword score: 0.0 = keyword only, 1.0 = semantic only */
   semanticWeight?: number;
+  /** Limit search to specific tiers (v0.9+) */
+  tiers?: string[];
 }
 
 export class SemanticRetriever {
@@ -154,6 +156,27 @@ export class SemanticRetriever {
 
       if (score > 0) {
         merged.set(id, score);
+      }
+    }
+
+    // Step 4: Apply tier weights (v0.9+) and sort
+    const tiers = options?.tiers || ['hot', 'warm', 'cold'];
+    const tierWeights: Record<string, number> = {
+      hot: 1.0,
+      warm: 0.7,
+      cold: 0.4,
+      frozen: 0, // not included by default
+    };
+
+    for (const [id, score] of merged) {
+      const unit = allKeywordUnits.get(id);
+      if (unit) {
+        const tier = unit.meta.tier || 'warm';
+        if (!tiers.includes(tier)) {
+          merged.delete(id);
+        } else {
+          merged.set(id, score * (tierWeights[tier] ?? 0.7));
+        }
       }
     }
 

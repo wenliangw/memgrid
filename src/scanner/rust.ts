@@ -90,6 +90,7 @@ export class RustScanner implements Scanner {
             confidence: 0.7,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         });
         continue;
@@ -113,6 +114,7 @@ export class RustScanner implements Scanner {
             confidence: 0.65,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         });
         continue;
@@ -135,6 +137,7 @@ export class RustScanner implements Scanner {
             confidence: 0.65,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         });
         continue;
@@ -157,6 +160,7 @@ export class RustScanner implements Scanner {
             confidence: 0.7,
             usage_count: 0,
             status: 'active',
+            tier: 'warm',
           },
         });
         continue;

@@ -199,6 +199,50 @@ export class MemGridServer {
             properties: {},
           },
         },
+        {
+          name: 'memgrid_rebalance',
+          description:
+            'Rebalance all memory units across tiers (hot/warm/cold/frozen). ' +
+            'Call periodically to maintain healthy memory distribution. ' +
+            'Cold overflow triggers freezing of lowest-retention units.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'memgrid_search_frozen',
+          description:
+            'Search the frozen tier for a specific memory clue (method name, keyword, etc). ' +
+            'Frozen memories are not returned by regular search — use this when a user ' +
+            'mentions something specific that might be in old, compressed memories.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              clue: {
+                type: 'string',
+                description: 'Exact keyword, method name, or phrase to find in frozen memories',
+              },
+            },
+            required: ['clue'],
+          },
+        },
+        {
+          name: 'memgrid_thaw',
+          description:
+            'Restore a frozen memory unit back to warm tier. ' +
+            'Use after memgrid_search_frozen found something the user wants to recover.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              unitId: {
+                type: 'string',
+                description: 'ID of the frozen unit to restore',
+              },
+            },
+            required: ['unitId'],
+          },
+        },
       ];
 
       return { tools };
@@ -492,6 +536,68 @@ export class MemGridServer {
             }
 
             return { content: [{ type: 'text', text: lines.join('\n') }] };
+          }
+
+          case 'memgrid_rebalance': {
+            const result = await this.mg.rebalance();
+            const lines = [
+              '⚖️  Memory tiers rebalanced:\n',
+              `  🔥 Hot:    ${result.hot}`,
+              `  🌤️  Warm:   ${result.warm}`,
+              `  ❄️  Cold:   ${result.cold}`,
+              `  🧊 Frozen:  ${result.frozen}`,
+              `  🔼 Promoted:  ${result.promoted}`,
+              `  🔽 Demoted:   ${result.demoted}`,
+            ];
+            if (result.frozenCount > 0) {
+              lines.push(
+                `\n💤 ${result.frozenCount} unit(s) frozen — use memgrid_search_frozen to find them.`,
+              );
+            }
+            lines.push('\n✅ Rebalance complete.');
+            return { content: [{ type: 'text', text: lines.join('\n') }] };
+          }
+
+          case 'memgrid_search_frozen': {
+            const { clue } = args as any;
+            const results = this.mg.searchFrozen(clue);
+
+            if (results.length === 0) {
+              return {
+                content: [{ type: 'text', text: 'No frozen memories match this clue.' }],
+              };
+            }
+
+            const lines = [`💤 ${results.length} frozen memory unit(s) match "${clue}":\n`];
+            for (const unit of results) {
+              lines.push(
+                `  [${unit.id}] ${unit.type}`,
+                `  ${unit.summary.slice(0, 100)}`,
+                unit.meta.lastAccessedAt ? `  Last access: ${unit.meta.lastAccessedAt}` : '',
+                `  → Thaw with: memgrid_thaw ${unit.id}`,
+                '',
+              );
+            }
+            return { content: [{ type: 'text', text: lines.join('\n') }] };
+          }
+
+          case 'memgrid_thaw': {
+            const { unitId } = args as any;
+            const unit = await this.mg.thaw(unitId);
+            if (unit) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `🔥 Thawed: [${unit.id}] ${unit.summary.slice(0, 80)}\n   Back to warm tier — now searchable.`,
+                  },
+                ],
+              };
+            }
+            return {
+              content: [{ type: 'text', text: `❌ Unit not found or not frozen: ${unitId}` }],
+              isError: true,
+            };
           }
 
           default:

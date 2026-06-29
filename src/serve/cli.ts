@@ -147,12 +147,24 @@ program
   .option('-n, --max <number>', 'Max results', '10')
   .option('-H, --hops <number>', 'Max association hops', '2')
   .option('-s, --semantic <number>', 'Semantic weight (0.0-1.0, default: 0.4)', '0.4')
+  .option(
+    '-t, --tier <tiers>',
+    'Limit to tiers: hot,warm,cold or all (default: hot,warm,cold)',
+    'hot,warm,cold',
+  )
   .action(async (query, options) => {
+    const tierMap: Record<string, string[]> = {
+      all: ['hot', 'warm', 'cold', 'frozen'],
+    };
+    const tierStr: string = options.tier;
+    const tiers = tierMap[tierStr] || tierStr.split(',').map((s: string) => s.trim());
+
     const mg = new MemGrid(process.cwd());
     const result = await mg.search(query, {
       maxResults: parseInt(options.max),
       maxHops: parseInt(options.hops),
       semanticWeight: parseFloat(options.semantic),
+      tiers: tiers as any,
     });
 
     console.log(mg.context(result));
@@ -307,6 +319,69 @@ program
   });
 
 program
+  .command('rebalance')
+  .description('Rebalance memory units across hot/warm/cold/frozen tiers')
+  .action(async () => {
+    const mg = new MemGrid(process.cwd());
+    console.log('⚖️  Rebalancing memory tiers...\n');
+    const result = await mg.rebalance();
+
+    console.log(`  📊 Hot:    ${result.hot}`);
+    console.log(`  🌤️  Warm:   ${result.warm}`);
+    console.log(`  ❄️  Cold:   ${result.cold}`);
+    console.log(`  🧊 Frozen:  ${result.frozen}`);
+    console.log(`  🔼 Promoted:  ${result.promoted}`);
+    console.log(`  🔽 Demoted:   ${result.demoted}`);
+    if (result.frozenCount > 0) {
+      console.log(`  💤 Newly frozen: ${result.frozenCount} unit(s)`);
+      console.log(
+        `     These are not searchable by default. Use 'memgrid search-frozen <clue>' to find them.`,
+      );
+    }
+    console.log('\n✅ Rebalance complete.');
+  });
+
+program
+  .command('thaw')
+  .description('Thaw a frozen memory unit back to warm tier')
+  .argument('<id>', 'Unit ID to thaw')
+  .action(async (id) => {
+    const mg = new MemGrid(process.cwd());
+    const unit = await mg.thaw(id);
+    if (unit) {
+      console.log(`🔥 Thawed: [${unit.id}] ${unit.summary.slice(0, 80)}`);
+      console.log('   Back to warm tier — now searchable.');
+    } else {
+      console.log(`❌ Unit not found or not frozen: ${id}`);
+    }
+  });
+
+program
+  .command('search-frozen')
+  .description('Search the frozen tier for a specific memory clue')
+  .argument('<clue>', 'Keyword, method name, or phrase to search frozen memories')
+  .action(async (clue) => {
+    const mg = new MemGrid(process.cwd());
+    const results = mg.searchFrozen(clue);
+
+    if (results.length === 0) {
+      console.log('No frozen memories match this clue.');
+      return;
+    }
+
+    console.log(`💤 ${results.length} frozen memory unit(s) match "${clue}":\n`);
+    for (const unit of results) {
+      console.log(`  [${unit.id}] ${unit.type}`);
+      console.log(`  ${unit.summary.slice(0, 100)}`);
+      if (unit.meta.lastAccessedAt) {
+        console.log(`  Last access: ${unit.meta.lastAccessedAt}`);
+      }
+      console.log(`  → Thaw with: memgrid thaw ${unit.id}`);
+      console.log('');
+    }
+  });
+
+program
   .command('stats')
   .description('Show grid statistics')
   .action(async () => {
@@ -326,6 +401,19 @@ program
       console.log(
         `\n  ⚠️  ${stats.candidateUnits} candidate unit(s) pending review. Run: memgrid review`,
       );
+    }
+
+    if (stats.tierDistribution) {
+      console.log(`\n  Tier distribution:`);
+      const tierOrder = ['hot', 'warm', 'cold', 'frozen'];
+      for (const tier of tierOrder) {
+        const count = stats.tierDistribution[tier] || 0;
+        if (count > 0) {
+          const icons: Record<string, string> = { hot: '🔥', warm: '🌤️', cold: '❄️', frozen: '🧊' };
+          console.log(`    ${icons[tier] || ''} ${tier}: ${count}`);
+        }
+      }
+      console.log(`    ⚡ Run 'memgrid rebalance' to update tiers.`);
     }
   });
 

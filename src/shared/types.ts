@@ -39,6 +39,8 @@ export interface Provenance {
   timestamp: string;
 }
 
+export type MemoryTier = 'hot' | 'warm' | 'cold' | 'frozen';
+
 export interface MemoryUnit {
   id: string;
   type: MemoryUnitType;
@@ -65,6 +67,10 @@ export interface MemoryUnit {
     confidence: number; // 0.0 ~ 1.0
     usage_count: number;
     status: 'active' | 'stale' | 'archived' | 'candidate';
+    /** Which storage tier (v0.9+) */
+    tier?: MemoryTier;
+    /** Last time this memory was accessed via search or touch (v0.9+) */
+    lastAccessedAt?: string;
   };
   /** Who created this memory and based on what (v0.8+) */
   provenance?: Provenance;
@@ -77,6 +83,19 @@ export interface ConflictResult {
   overlapScore: number;
   hasOpposition: boolean;
 }
+
+/** Result of tier rebalancing */
+export interface RebalanceResult {
+  hot: number;
+  warm: number;
+  cold: number;
+  frozen: number;
+  promoted: number;
+  demoted: number;
+  frozenCount: number;
+  thawedCount: number;
+}
+
 export type FileSnapshot = Record<string, string>;
 
 export interface MemoryGrid {
@@ -165,6 +184,8 @@ export interface SearchOptions {
   maxResults?: number;
   maxHops?: number;
   semanticWeight?: number;
+  /** Limit search to specific tiers (v0.9+). Default: hot+warm */
+  tiers?: MemoryTier[];
 }
 
 /** Single-file scan result from SyncEngine */
