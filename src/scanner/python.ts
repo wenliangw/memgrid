@@ -105,7 +105,7 @@ export class PythonScanner implements Scanner {
 
         units.push({
           id: `method_py_${this.sanitizeId(currentClass)}`,
-          type: 'method',
+          type: 'fact',
           summary: `${currentClass}${doc ? ` — ${doc}` : ''}`,
           source: { file, lines: `${i + 1}` },
           signatures: [currentClass],
@@ -143,7 +143,7 @@ export class PythonScanner implements Scanner {
 
         const unit: MemoryUnit = {
           id: `method_py_${this.sanitizeId(fullName)}`,
-          type: 'method',
+          type: 'fact',
           summary: doc ? `${fullName}() — ${doc}` : `${fullName}()`,
           source: { file, lines: `${i + 1}` },
           signatures: [fullName, funcName],
@@ -165,7 +165,7 @@ export class PythonScanner implements Scanner {
 
         // Add decorator info
         if (decorators.length > 0) {
-          unit.content.style_notes = `Decorators: ${decorators.join(', ')}`;
+          unit.narrative = `Decorators: ${decorators.join(', ')}`;
         }
 
         units.push(unit);

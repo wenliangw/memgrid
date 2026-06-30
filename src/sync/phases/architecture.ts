@@ -18,7 +18,7 @@ export function checkArchitecture(
 
   // Collect all architecture_principle units
   const principles = Array.from(allUnits.values()).filter(
-    (u) => u.type === 'architecture_principle' && u.meta.status === 'active',
+    (u) => u.type === 'preference' && u.meta.status === 'active',
   );
 
   for (const file of changedFiles) {
@@ -92,7 +92,7 @@ export function checkArchitecture(
  * Uses text matching — crude but effective for well-written principles.
  */
 function checkPrincipleViolation(code: string, principle: MemoryUnit, _file: string): boolean {
-  const text = (principle.summary + ' ' + (principle.content.description || '')).toLowerCase();
+  const text = (principle.summary + ' ' + (principle.narrative || '')).toLowerCase();
 
   // forwardRef ban
   if (text.includes('forwardref') && text.includes('禁止') && code.includes('forwardRef(')) {

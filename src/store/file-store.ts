@@ -1,6 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { MemoryUnit, MemoryGrid, MemoryUnitType } from '../shared/types.js';
+import type {
+  MemoryUnit,
+  MemoryGrid,
+  MemoryUnitType,
+  LegacyMemoryUnitType,
+} from '../shared/types.js';
+import { LEGACY_TYPE_MAP } from '../shared/types.js';
 
 const GRID_DIR = '.memgrid';
 const UNITS_DIR = 'units';
@@ -79,7 +85,18 @@ export class FileStore {
     const parseUnit = (filePath: string): MemoryUnit | null => {
       try {
         const content = fs.readFileSync(filePath, 'utf-8');
-        return JSON.parse(content) as MemoryUnit;
+        const raw = JSON.parse(content) as any;
+        // Auto-migrate: old units with content.description → narrative
+        if (raw.content?.description && !raw.narrative) {
+          raw.narrative = raw.content.description;
+        }
+        // Auto-migrate: legacy type → new type
+        if (LEGACY_TYPE_MAP[raw.type as LegacyMemoryUnitType]) {
+          raw.type = LEGACY_TYPE_MAP[raw.type as LegacyMemoryUnitType];
+        }
+        // Ensure keywords exists
+        if (!raw.keywords) raw.keywords = [];
+        return raw as MemoryUnit;
       } catch {
         return null;
       }
@@ -180,6 +197,16 @@ export class FileStore {
 
   saveUnit(unit: MemoryUnit): void {
     this.ensureLoaded();
+    // Auto-normalize: migrate old content.description → narrative
+    if (!unit.narrative && (unit as any).content?.description) {
+      unit.narrative = (unit as any).content.description;
+    }
+    if (!unit.narrative) unit.narrative = unit.summary || '';
+    if (!unit.keywords) unit.keywords = [];
+    // Auto-upgrade legacy type
+    if (LEGACY_TYPE_MAP[unit.type as LegacyMemoryUnitType]) {
+      (unit as any).type = LEGACY_TYPE_MAP[unit.type as LegacyMemoryUnitType];
+    }
     const filePath = this.unitPath(unit.id);
     const jsonStr = JSON.stringify(unit, null, 2);
     fs.writeFileSync(filePath, jsonStr, 'utf-8');
@@ -315,7 +342,7 @@ export class FileStore {
       a.meta.status === b.meta.status &&
       a.meta.updated === b.meta.updated &&
       a.associations.length === b.associations.length &&
-      a.content.description === b.content.description
+      a.narrative === b.narrative
     );
   }
 }

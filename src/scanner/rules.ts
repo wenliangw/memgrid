@@ -41,7 +41,7 @@ export class RulesScanner implements Scanner {
         .toLowerCase();
       units.push({
         id: `trigger_rule_${safeFile}`,
-        type: 'rule_trigger',
+        type: 'preference',
         summary: `When working on ${file.replace('.md', '').replace(/-/g, ' ')} → load ${file}`,
         source: { file: relativePath },
         signatures: [file.replace('.md', '').replace(/-/g, ' ')],

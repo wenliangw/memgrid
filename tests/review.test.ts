@@ -24,7 +24,7 @@ describe('Candidate review (v0.8)', () => {
   function makeUnit(id: string, status: 'candidate' | 'active'): MemoryUnit {
     return {
       id,
-      type: 'pattern',
+      type: 'insight',
       summary: `Test pattern ${id}`,
       signatures: [id],
       content: { description: `Description for ${id}` },
@@ -109,7 +109,7 @@ describe('Candidate review (v0.8)', () => {
   it('search excludes candidate units', () => {
     store.saveUnit(makeUnit('c_search', 'candidate'));
     const active = makeUnit('a_search', 'active');
-    active.content.description = 'API creation endpoint handler';
+    active.narrative = 'API creation endpoint handler';
     active.signatures = ['handleCreation'];
     store.saveUnit(active);
 
@@ -121,22 +121,22 @@ describe('Candidate review (v0.8)', () => {
 
   it('detectConflicts finds opposing preferences', () => {
     const a = makeUnit('s1', 'active');
-    a.type = 'style_preference';
+    a.type = 'preference';
     a.summary = 'Prefer Dialog over Collapse';
-    a.content.description = 'Use Dialog for all modal interactions';
+    a.narrative = 'Use Dialog for all modal interactions';
     store.saveUnit(a);
 
     const b = makeUnit('s2', 'active');
-    b.type = 'style_preference';
+    b.type = 'preference';
     b.summary = 'Prefer Collapse over Dialog';
-    b.content.description = 'Use Collapse instead of Dialog';
+    b.narrative = 'Use Collapse instead of Dialog';
     store.saveUnit(b);
 
     // Also add a non-conflicting unit
     const c = makeUnit('s3', 'active');
-    c.type = 'error_solution';
+    c.type = 'insight';
     c.summary = 'Fix N+1 query in list endpoint';
-    c.content.description = 'Use preload to batch load relations';
+    c.narrative = 'Use preload to batch load relations';
     store.saveUnit(c);
 
     // Use same store instance for MemGrid
@@ -146,7 +146,7 @@ describe('Candidate review (v0.8)', () => {
 
     expect(conflicts.length).toBeGreaterThanOrEqual(1);
     const styleConflict = conflicts.find(
-      (cf) => cf.unitA.type === 'style_preference' && cf.unitB.type === 'style_preference',
+      (cf) => cf.unitA.type === 'preference' && cf.unitB.type === 'preference',
     );
     expect(styleConflict).toBeDefined();
     expect(styleConflict!.hasOpposition).toBe(true);
@@ -155,15 +155,15 @@ describe('Candidate review (v0.8)', () => {
 
   it('detectConflicts returns empty for unrelated units', () => {
     const a = makeUnit('d1', 'active');
-    a.type = 'decision';
+    a.type = 'insight';
     a.summary = 'Choose PostgreSQL for primary storage';
-    a.content.description = 'ACID compliance and team expertise';
+    a.narrative = 'ACID compliance and team expertise';
     store.saveUnit(a);
 
     const b = makeUnit('d2', 'active');
-    b.type = 'decision';
+    b.type = 'insight';
     b.summary = 'Use Redis for session caching';
-    b.content.description = 'Fast in-memory cache with TTL support';
+    b.narrative = 'Fast in-memory cache with TTL support';
     store.saveUnit(b);
 
     const mg = new MemGrid(tmpDir);
@@ -191,7 +191,7 @@ describe('Tiered storage (v0.9)', () => {
   function makeTierUnit(id: string, tier: string, accessedAt: string, usage: number): MemoryUnit {
     return {
       id,
-      type: 'method',
+      type: 'fact',
       summary: `Method ${id}`,
       signatures: [id],
       content: { description: `Description for ${id}` },
@@ -257,7 +257,7 @@ describe('Tiered storage (v0.9)', () => {
     // Create 200 cold units (way over 30% of 300 = 90 cold capacity)
     for (let i = 0; i < 200; i++) {
       const unit = makeTierUnit(`cold_${i}`, 'cold', ninetyDaysAgo, 0);
-      unit.type = 'style_preference'; // low type weight → low retention score
+      unit.type = 'preference'; // low type weight → low retention score
       store.saveUnit(unit);
     }
 
@@ -295,7 +295,7 @@ describe('Tiered storage (v0.9)', () => {
     const u1 = makeTierUnit('f_search', 'frozen', ninetyDaysAgo, 0);
     u1.summary = 'CreationDomainService.create — Create new work';
     u1.signatures = ['CreationDomainService.create'];
-    u1.content.description = 'Creates a new work entity with ownership validation';
+    u1.narrative = 'Creates a new work entity with ownership validation';
     store.saveUnit(u1);
 
     const mg = new MemGrid(tmpDir);

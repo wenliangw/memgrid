@@ -98,7 +98,7 @@ export class JavaScriptScanner implements Scanner {
         const methods = this.extractClassMethods(lines, i);
         units.push({
           id: `method_js_${match[1].toLowerCase()}`,
-          type: 'method',
+          type: 'fact',
           summary: `${match[1]} (class)`,
           source: { file, lines: `${i + 1}` },
           signatures: [match[1]],
@@ -130,7 +130,7 @@ export class JavaScriptScanner implements Scanner {
   ): void {
     units.push({
       id: `method_js_${name.toLowerCase()}`,
-      type: 'method',
+      type: 'fact',
       summary: `${name}()${extraDesc ? ` — ${extraDesc}` : ''}`,
       source: { file, lines: `${line}` },
       signatures: [name],

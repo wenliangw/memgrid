@@ -1,5 +1,5 @@
 import MiniSearch from 'minisearch';
-import type { MemoryUnit, SearchResult, Association } from '../shared/types.js';
+import type { MemoryUnit, SearchResult } from '../shared/types.js';
 import type { FileStore } from '../store/file-store.js';
 
 /**
@@ -44,17 +44,10 @@ export class RetrieveEngine {
     if (this.index && this.indexBuilt) return;
 
     this.index = new MiniSearch({
-      fields: [
-        'summary',
-        'signatures',
-        'keywords',
-        'content.description',
-        'content.trigger',
-        'content.action',
-      ],
+      fields: ['summary', 'signatures', 'keywords', 'narrative'],
       storeFields: ['id'],
       searchOptions: {
-        boost: { summary: 5, keywords: 4, signatures: 3 },
+        boost: { summary: 5, keywords: 4, narrative: 3, signatures: 3 },
         prefix: true,
         fuzzy: 0.2,
       },
@@ -68,9 +61,8 @@ export class RetrieveEngine {
           id: u.id,
           summary: u.summary,
           signatures: u.signatures.join(' '),
-          'content.description': u.content.description,
-          'content.trigger': u.content.trigger || '',
-          'content.action': u.content.action || '',
+          narrative: u.narrative || '',
+          keywords: (u.keywords || []).join(' '),
         })),
       );
     }
@@ -88,9 +80,8 @@ export class RetrieveEngine {
       id: unit.id,
       summary: unit.summary,
       signatures: unit.signatures.join(' '),
-      'content.description': unit.content.description,
-      'content.trigger': unit.content.trigger || '',
-      'content.action': unit.content.action || '',
+      narrative: unit.narrative || '',
+      keywords: (unit.keywords || []).join(' '),
     });
     this.resultCache.clear(); // Invalidate cache on any change
   }
@@ -101,166 +92,112 @@ export class RetrieveEngine {
     this.resultCache.clear();
   }
 
-  async search(query: string, maxResults = 10, maxHops = 2): Promise<SearchResult> {
-    const startTime = Date.now();
-
-    // Check result cache first (exact query match)
-    const cacheKey = `${query}::${maxResults}::${maxHops}`;
-    const cached = this.resultCache.get(cacheKey);
-    if (cached) {
-      return { ...cached, elapsedMs: Date.now() - startTime };
-    }
-
-    // Ensure index is built
-    this.ensureIndex();
-    if (!this.index) {
-      return { query, units: [], totalHops: 0, elapsedMs: Date.now() - startTime };
-    }
-
-    // Step 1: Keyword search (reused index — no rebuild!)
-    const results = this.index.search(query, { prefix: true, fuzzy: 0.2 });
-    const keywordUnitIds = new Map<string, number>();
-    for (const r of results) {
-      keywordUnitIds.set(r.id, r.score);
-    }
-
-    // Step 2: Traverse associations (BFS)
-    const visited = new Set<string>();
-    const queue: { id: string; hop: number }[] = [];
-
-    for (const [id] of keywordUnitIds) {
-      visited.add(id);
-      queue.push({ id, hop: 0 });
-    }
-
-    const grid = this.store.getGrid();
-    const edgeIndex = grid?.edgeIndex ?? {};
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      if (current.hop >= maxHops) continue;
-
-      const edges = edgeIndex[current.id] || [];
-      for (const edge of edges) {
-        if (!visited.has(edge.to)) {
-          visited.add(edge.to);
-          queue.push({ id: edge.to, hop: current.hop + 1 });
-        }
-      }
-    }
-
-    // Step 3: Collect and rank (from cache, O(1) lookups)
-    const matchedUnits: { unit: MemoryUnit; score: number }[] = [];
-    const allUnits = this.getCachedUnits();
-    const unitMap = new Map<string, MemoryUnit>();
-    for (const u of allUnits) unitMap.set(u.id, u);
-
-    for (const id of visited) {
-      const unit = unitMap.get(id);
-      if (!unit) continue;
-
-      const keywordScore = keywordUnitIds.get(id) || 0;
-      const associationBonus = this.computeAssociationBonus(id, keywordUnitIds, edgeIndex);
-      const usageBonus = Math.min(unit.meta.usage_count / 50, 0.2);
-
-      let score = keywordScore * 0.7 + associationBonus * 0.2 + usageBonus * 0.1;
-      if (unit.type === 'pattern') score *= 0.8;
-      matchedUnits.push({ unit, score });
-    }
-
-    matchedUnits.sort((a, b) => b.score - a.score);
-    const topUnits = matchedUnits.slice(0, maxResults).map((m) => m.unit);
-
-    const result: SearchResult = {
-      query,
-      units: topUnits,
-      totalHops: maxHops,
-      elapsedMs: Date.now() - startTime,
-    };
-
-    // Cache result
-    this.resultCache.set(cacheKey, result);
-
-    return result;
-  }
-
-  private computeAssociationBonus(
-    unitId: string,
-    seedScores: Map<string, number>,
-    edgeIndex: Record<string, Association[]>,
-  ): number {
-    let bonus = 0;
-    for (const [seedId, score] of seedScores) {
-      const edges = edgeIndex[seedId] || [];
-      if (edges.some((e) => e.to === unitId)) {
-        bonus += score * 0.1;
-      }
-    }
-    return Math.min(bonus, 1.0);
+  /**
+   * Get active units from cache (with stale included).
+   */
+  private getCachedUnits(): MemoryUnit[] {
+    const all = this.store.listUnitsSync({ includeCandidate: true }) || [];
+    return all.filter((u) => u.meta.status === 'active' || u.meta.status === 'stale');
   }
 
   /**
-   * Get units from store (in-memory after load, otherwise disk).
+   * Search: keyword + associative expansion (hops).
    */
-  private getCachedUnits(): MemoryUnit[] {
-    // FileStore.listUnits() reads from in-memory Map after load(),
-    // or loads from disk on first access. Safe to call sync — it's fast.
-    // Must use the public API, not internal cache field (private fields
-    // become #private in ES2022 target).
-    const list = this.store.listUnitsSync?.() || [];
-    if (list.length > 0) return list;
-    // Fallback: load on first call
-    this.store.load();
-    return this.store.listUnitsSync?.() || [];
+  search(query: string, options?: { maxResults?: number; maxHops?: number }): SearchResult {
+    const start = Date.now();
+    const maxResults = options?.maxResults ?? 10;
+    const maxHops = options?.maxHops ?? 2;
+
+    this.ensureIndex();
+    if (!this.index) {
+      return { query, units: [], totalHops: 0, elapsedMs: Date.now() - start };
+    }
+
+    // Step 1: keyword search
+    const raw = this.index.search(query, { prefix: true, fuzzy: 0.2 });
+
+    // Step 2: deduplicate & collect
+    const seen = new Set<string>();
+    const units: MemoryUnit[] = [];
+
+    for (const hit of raw) {
+      if (units.length >= maxResults) break;
+      if (seen.has(hit.id)) continue;
+      seen.add(hit.id);
+      const unit = this.store.getUnit(hit.id);
+      if (unit && (unit.meta.status === 'active' || unit.meta.status === 'stale')) {
+        units.push(unit);
+      }
+    }
+
+    // Step 3: associative expansion (hops)
+    let totalHops = 0;
+    for (let hop = 0; hop < maxHops; hop++) {
+      const currentIds = new Set(units.map((u) => u.id));
+      let added = 0;
+      for (const unit of [...units]) {
+        for (const assoc of unit.associations || []) {
+          if (units.length >= maxResults * 2) break;
+          if (currentIds.has(assoc.to)) continue;
+          if (seen.has(assoc.to)) continue;
+          seen.add(assoc.to);
+          const linked = this.store.getUnit(assoc.to);
+          if (linked && (linked.meta.status === 'active' || linked.meta.status === 'stale')) {
+            units.push(linked);
+            added++;
+          }
+        }
+      }
+      totalHops++;
+      if (added === 0) break;
+    }
+
+    return {
+      query,
+      units: units.slice(0, maxResults),
+      totalHops,
+      elapsedMs: Date.now() - start,
+    };
   }
 
+  /**
+   * Format a unit for display context.
+   */
+  context(unit: MemoryUnit): string {
+    const lines: string[] = [];
+    lines.push(`[${unit.type}] ${unit.summary}`);
+    if (unit.signatures.length > 0) {
+      lines.push(`  signatures: ${unit.signatures.join(', ')}`);
+    }
+    if (unit.narrative) {
+      lines.push(`  ${unit.narrative.slice(0, 300)}`);
+    }
+    if (unit.keywords && unit.keywords.length > 0) {
+      lines.push(`  keywords: ${unit.keywords.join(', ')}`);
+    }
+    if (unit.code_snippet) {
+      lines.push(`  code:\n${unit.code_snippet.slice(0, 200)}`);
+    }
+    if (unit.library_ref) {
+      lines.push(`  📚 library: ${unit.library_ref}`);
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * Format full search results as context string.
+   */
   toContext(result: SearchResult): string {
     if (result.units.length === 0) {
-      return 'No relevant memory units found.';
+      return `No matching memories found for "${result.query}".`;
     }
-
-    const lines: string[] = [
-      `## MemGrid Context (${result.units.length} units, ${result.elapsedMs}ms)`,
-      '',
+    const lines = [
+      `Found ${result.units.length} memories for "${result.query}" (${result.elapsedMs}ms):`,
     ];
-
-    for (const unit of result.units) {
-      lines.push(`### ${unit.id} (${unit.type})`);
-      lines.push(`- **${unit.summary}**`);
-      if (unit.source?.file) {
-        const srcType = unit.source.type || 'source';
-        lines.push(
-          `- 📄 ${srcType}: \`${unit.source.file}\`${unit.source.lines ? `:${unit.source.lines}` : ''}`,
-        );
-      }
-      if (unit.keywords && unit.keywords.length > 0) {
-        lines.push(`- 🔑 ${unit.keywords.join(', ')}`);
-      }
-      if (unit.content.inputs && unit.content.inputs !== 'none') {
-        lines.push(`- inputs: ${unit.content.inputs}`);
-      }
-      if (unit.content.outputs && unit.content.outputs !== 'void') {
-        lines.push(`- outputs: ${unit.content.outputs}`);
-      }
-      if (unit.content.description) {
-        lines.push(`- ${unit.content.description.slice(0, 300)}`);
-      }
-      if (unit.provenance) {
-        lines.push(
-          `- from: ${unit.provenance.createdBy} — ${unit.provenance.timestamp?.slice(0, 10) || ''}`,
-        );
-      }
-      if (unit.content.style_notes) {
-        lines.push(`- style: ${unit.content.style_notes}`);
-      }
-      if (unit.content.code_snippet) {
-        lines.push('```ts');
-        lines.push(unit.content.code_snippet.slice(0, 200));
-        lines.push('```');
-      }
-      lines.push('');
+    for (const u of result.units) {
+      lines.push(`\n--- ${u.id} ---`);
+      lines.push(this.context(u));
     }
-
     return lines.join('\n');
   }
 }

@@ -86,7 +86,7 @@ export class GoScanner implements Scanner {
         const ret = match[3] || '';
         units.push({
           id: `method_go_${this.sanitizeId(funcName)}`,
-          type: 'method',
+          type: 'fact',
           summary: `${funcName}(${params}) ${ret}`.trim(),
           source: { file, lines: `${i + 1}` },
           signatures: [funcName],
@@ -121,7 +121,7 @@ export class GoScanner implements Scanner {
 
         units.push({
           id: `method_go_${this.sanitizeId(receiverType + '_' + methodName)}`,
-          type: 'method',
+          type: 'fact',
           summary: `${receiverType}.${methodName}(${params}) ${ret}`.trim(),
           source: { file, lines: `${i + 1}` },
           signatures: [`${receiverType}.${methodName}`, methodName],
@@ -151,7 +151,7 @@ export class GoScanner implements Scanner {
 
         units.push({
           id: `method_go_struct_${this.sanitizeId(structName)}`,
-          type: 'method',
+          type: 'fact',
           summary: `${structName} (struct)`,
           source: { file, lines: `${i + 1}` },
           signatures: [structName],
@@ -174,7 +174,7 @@ export class GoScanner implements Scanner {
       if (match) {
         units.push({
           id: `method_go_iface_${this.sanitizeId(match[1])}`,
-          type: 'pattern',
+          type: 'insight',
           summary: `${match[1]} (interface)`,
           source: { file, lines: `${i + 1}` },
           signatures: [match[1]],

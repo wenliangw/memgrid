@@ -65,7 +65,7 @@ export class MarkdownScanner implements Scanner {
 
           units.push({
             id: `doc_${safeFile}_${safeTitle}`,
-            type: 'pattern',
+            type: 'insight',
             summary: `${path.basename(rel)} → ${title}`,
             source: { file: rel },
             signatures: [title, path.basename(rel).replace('.md', '')],

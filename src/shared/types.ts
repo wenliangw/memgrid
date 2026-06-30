@@ -1,6 +1,10 @@
 // === Memory Unit Types ===
 
-export type MemoryUnitType =
+/** Cognitive memory types — cross-domain, human-mind oriented */
+export type MemoryUnitType = 'fact' | 'insight' | 'event' | 'preference';
+
+/** @deprecated Old code-metaphor types (v0.9-). Still accepted but mapped to new types on write. */
+export type LegacyMemoryUnitType =
   | 'method'
   | 'component'
   | 'pattern'
@@ -13,17 +17,43 @@ export type MemoryUnitType =
   | 'style_preference'
   | 'architecture_principle';
 
+/** Accept both new and legacy types */
+export type AnyMemoryUnitType = MemoryUnitType | LegacyMemoryUnitType;
+
+/** Map legacy type → new cognitive type */
+export const LEGACY_TYPE_MAP: Record<LegacyMemoryUnitType, MemoryUnitType> = {
+  method: 'fact',
+  component: 'fact',
+  config: 'fact',
+  pattern: 'insight',
+  error_solution: 'insight',
+  decision: 'insight',
+  architecture_principle: 'preference',
+  style_preference: 'preference',
+  rule_trigger: 'preference',
+  skill_trigger: 'event',
+  mcp_trigger: 'event',
+};
+
 export type RelationType =
+  | 'caused_by'
+  | 'causes'
+  | 'related_to'
+  | 'references'
+  | 'contradicts'
+  | 'supersedes'
+  | 'embodies'
+  | 'paired_with'
+  | 'triggers'
+  | 'belongs_to'
+  // Legacy compat
   | 'calls'
   | 'used_by'
   | 'implements_pattern'
   | 'follows_rule'
   | 'similar_pattern'
   | 'similar_error'
-  | 'paired_with'
-  | 'embodies'
-  | 'belongs_to_module'
-  | 'triggers';
+  | 'belongs_to_module';
 
 export interface Association {
   to: string;
@@ -33,7 +63,7 @@ export interface Association {
 
 /** Provenance chain: who created this memory and based on what */
 export interface Provenance {
-  createdBy: string; // "scanner:typescript" | "ai:claude" | "user"
+  createdBy: string; // "scanner:typescript" | "ai:claude" | "agent:糖豆" | "user"
   basedOnTask?: string; // task summary that produced this memory
   evidenceUnits?: string[]; // IDs of units used as evidence
   timestamp: string;
@@ -41,19 +71,36 @@ export interface Provenance {
 
 export type MemoryTier = 'hot' | 'warm' | 'cold' | 'frozen';
 
+/**
+ * MemoryUnit — the core memory atom.
+ *
+ * Structure (for indexing)     | Narrative (for understanding)
+ * -----------------------------|------------------------------
+ * id, type, domain, keywords   | summary, narrative
+ * associations                 |
+ * source, code_snippet         |
+ */
 export interface MemoryUnit {
   id: string;
   type: MemoryUnitType;
+  /** Domain this memory belongs to */
+  domain?: string;
+  /** One-line summary — lightweight index card title */
   summary: string;
+  /** Natural language narrative — time, people, events, causality live here */
+  narrative?: string;
+  /** Source information */
   source?: {
-    file: string;
+    file?: string;
     lines?: string;
-    /** Source type: source code, markdown doc, atom, etc. (v0.10+) */
-    type?: 'code' | 'markdown' | 'atom' | 'document';
+    /** Source type: source code, markdown doc, atom, etc. */
+    type?: 'code' | 'markdown' | 'atom' | 'document' | 'library';
   };
+  /** Function/method signatures (from code scanning) */
   signatures: string[];
-  content: {
-    description?: string; // made optional (v0.10+) — use source.file for full content
+  /** @deprecated Use narrative, keywords, code_snippet directly. Kept for backward compat. */
+  content?: {
+    description?: string;
     inputs?: string;
     outputs?: string;
     dependencies?: string[];
@@ -62,8 +109,12 @@ export interface MemoryUnit {
     trigger?: string;
     action?: string;
   };
-  /** Search keywords (v0.10+) — lightweight index for retrieval */
+  /** Code snippet if applicable */
+  code_snippet?: string;
+  /** Search keywords — lightweight index for retrieval */
   keywords?: string[];
+  /** Reference to a library document for full content */
+  library_ref?: string;
   associations: Association[];
   meta: {
     created: string;
@@ -79,6 +130,30 @@ export interface MemoryUnit {
   /** Who created this memory and based on what (v0.8+) */
   provenance?: Provenance;
 }
+
+// ===== Library Types =====
+
+export interface LibraryUnit {
+  id: string;
+  title: string;
+  content: string; // full text
+  source?: {
+    file: string; // original file path (for migration)
+    type?: 'memory' | 'document' | 'log';
+    migratedAt?: string;
+  };
+  keywords: string[];
+  domain: string; // which domain this library doc belongs to
+  meta: {
+    created: string;
+    updated: string;
+    size: number; // content length in chars
+    usage_count: number;
+    status: 'active' | 'archived';
+  };
+}
+
+// ===== Conflict / Rebalance / Sync types =====
 
 /** A conflict detected between two memory units */
 export interface ConflictResult {
@@ -118,55 +193,38 @@ export interface MemoryGrid {
 
 /** Result of a sync operation */
 export interface SyncResult {
-  /** Files that changed (has hash delta) */
   changedFiles: string[];
-  /** Files that were removed entirely */
   removedFiles: string[];
-  /** Units added or updated */
   updatedUnits: number;
-  /** Units marked stale (method name/line changed beyond fuzzy match) */
   staleUnits: number;
-  /** Associations repaired via fuzzy match */
   repairedAssociations: number;
-  /** Broken associations that couldn't be repaired */
   brokenAssociations: number;
-  /** New associations discovered from code analysis */
   newAssociations: number;
-  /** Patterns detected in recent changes */
   detectedPatterns: SyncPattern[];
-  /** Architecture alerts triggered by changes */
   alerts: SyncAlert[];
-  /** Auto-created memory units from learning engine (high-confidence, auto-active) */
   autoLearnedUnits: number;
-  /** Candidate units created (need review before searchable) */
   candidateUnitsCreated: number;
-  /** Total time in ms */
   elapsedMs: number;
 }
 
-/** A pattern detected during sync (new error handling, design pattern, etc.) */
 export interface SyncPattern {
-  type: 'error_solution' | 'pattern' | 'decision';
+  type: 'insight' | 'event' | 'fact';
   summary: string;
   file: string;
   confidence: number;
 }
 
-/** An architecture alert triggered by a code change */
 export interface SyncAlert {
   level: 'warning' | 'error';
   message: string;
   file: string;
-  /** Which principle unit triggered this alert */
   principle?: string;
 }
 
-/** Options for sync */
 export interface SyncOptions {
   projectRoot: string;
   includeRules: boolean;
   includeExamples: boolean;
-  /** Max fuzzy match distance (0.0 = exact, 1.0 = anything) */
   fuzzyThreshold?: number;
 }
 
@@ -188,11 +246,9 @@ export interface SearchOptions {
   maxResults?: number;
   maxHops?: number;
   semanticWeight?: number;
-  /** Limit search to specific tiers (v0.9+). Default: hot+warm */
   tiers?: MemoryTier[];
 }
 
-/** Single-file scan result from SyncEngine */
 export interface FileScanResult {
   file: string;
   units: MemoryUnit[];
@@ -201,18 +257,17 @@ export interface FileScanResult {
 
 // ===== Multi-Domain Types (v0.10+) =====
 
-export type DomainType =
-  | 'project'
-  | 'server'
-  | 'toolkit'
-  | 'personality'
-  | 'agent-session'
-  | 'gateway'
-  | 'custom';
+/**
+ * Domain type is now free-form.
+ * Only "personality" is treated as built-in.
+ * All other domains derive meaning from content, not labels.
+ */
+export type DomainType = 'personality' | string;
 
 export interface MemoryDomain {
   name: string;
-  type: DomainType;
+  /** @deprecated Use name/content to determine semantics. Kept for backward compat. */
+  type?: DomainType;
   path: string;
   description?: string;
   enabled: boolean;
@@ -231,4 +286,28 @@ export interface CrossDomainAssociation {
   to: { domain: string; unitId: string };
   relation: string;
   weight: number;
+}
+
+// ===== Extract Engine Types (v0.10+) =====
+
+/** Configuration for the extract engine */
+export interface ExtractConfig {
+  enabled: boolean;
+  /** Model to use for LLM refinement. Uses agent's model if not set. */
+  model?: string;
+  /** Minimum confidence to auto-activate (skip candidate review) */
+  autoActivateThreshold?: number;
+}
+
+/** A raw candidate extracted from conversation */
+export interface ExtractCandidate {
+  type: MemoryUnitType;
+  summary: string;
+  narrative: string;
+  keywords: string[];
+  confidence: number;
+  /** Which part of the conversation triggered this */
+  sourceText: string;
+  /** Related unit IDs */
+  relatedTo?: string[];
 }

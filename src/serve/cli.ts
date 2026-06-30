@@ -18,6 +18,8 @@ import { startMCPServer } from './mcp-server.js';
 import { injectHooks } from '../hooks.js';
 import { parseMemoryInput, createMemoryUnit } from '../learn/nlp.js';
 import { DomainManager } from '../domain/domain-manager.js';
+import { LibraryManager } from '../library/index.js';
+import type { MemoryUnit, MemoryUnitType, LibraryUnit } from '../shared/types.js';
 
 const program = new Command();
 
@@ -124,12 +126,17 @@ program
           }
         }
 
-        // Generate global migration guide
-        generateMigrationGuide(dm.gridDir);
-        console.log(`\n  📋 Migration guide: ~/.memgrid/MIGRATION.md`);
-        console.log(
-          `     → Tell your agent: "Please read MIGRATION.md and migrate existing memories into MemGrid"`,
-        );
+        // Auto-migrate existing OpenClaw memories into MemGrid
+        const migResult = migrateExistingMemories(dm);
+        if (migResult.total > 0) {
+          console.log(`\n  📋 Auto-migrated ${migResult.total} existing memories:`);
+          console.log(`     → ${migResult.memoryUnits} memory unit(s)`);
+          console.log(`     → ${migResult.libraryDocs} library document(s)`);
+          if (migResult.skipped > 0) {
+            console.log(`     → ${migResult.skipped} file(s) skipped (already migrated)`);
+          }
+          console.log(`     📁 Original files preserved (not deleted)`);
+        }
       }
 
       // Generate OpenClaw Gateway config
@@ -355,7 +362,7 @@ program
       console.log(`\n🧠 Patterns detected:`);
       for (const p of result.detectedPatterns) {
         console.log(
-          `  ${p.type === 'error_solution' ? '🐛' : p.type === 'pattern' ? '📐' : '📋'} ${p.summary} (${p.file})`,
+          `  ${p.type === 'insight' ? '💡' : p.type === 'event' ? '📋' : '📋'} ${p.summary} (${p.file})`,
         );
       }
     }
@@ -422,9 +429,8 @@ program
       id,
       type: options.type as any,
       summary: options.summary,
-      content: {
-        description: options.description,
-      },
+      narrative: options.description || options.summary,
+      keywords: [],
       source: options.file ? { file: options.file, lines: options.lines } : undefined,
     });
 
@@ -446,8 +452,7 @@ program
 
     console.log(`🧠 Learned: [${parsed.type}] ${parsed.summary.slice(0, 60)}`);
     console.log(`   id: ${unit.id}`);
-    if (parsed.content.trigger) console.log(`   trigger: ${parsed.content.trigger}`);
-    if (parsed.content.action) console.log(`   action: ${parsed.content.action}`);
+    if (parsed.keywords.length > 0) console.log(`   keywords: ${parsed.keywords.join(', ')}`);
     console.log(`   confidence: ${parsed.confidence}`);
   });
 
@@ -655,7 +660,7 @@ program
           gateway: '🔌',
           custom: '📁',
         };
-        console.log(`  ${icon[d.type] || '📁'} ${d.name}  [${d.type}]`);
+        console.log(`  ${icon[d.type || ''] || '📁'} ${d.name}  [${d.type || 'custom'}]`);
         console.log(`     ${d.path}`);
         console.log(`     ${d.enabled ? '✅ enabled' : '⏸️  disabled'}`);
         if (d.description) console.log(`     ${d.description}`);
@@ -715,6 +720,127 @@ program
     console.error('🚀 MemGrid MCP Server starting...');
     console.error(`   Domain: ${root}`);
     await startMCPServer(root);
+  });
+
+// ===== Library Commands =====
+
+program
+  .command('library-add')
+  .alias('lib-add')
+  .description('Add a document to the knowledge library')
+  .requiredOption('-t, --title <title>', 'Document title')
+  .requiredOption('-d, --domain <domain>', 'Domain name')
+  .option('-f, --file <path>', 'Read content from file')
+  .option('-c, --content <text>', 'Content text')
+  .action(async (options) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    let content: string;
+    if (options.file) {
+      if (!fs.existsSync(options.file)) {
+        console.error(`❌ File not found: ${options.file}`);
+        process.exit(1);
+      }
+      content = fs.readFileSync(options.file, 'utf-8');
+    } else if (options.content) {
+      content = options.content;
+    } else {
+      // Read from stdin
+      content = fs.readFileSync(0, 'utf-8');
+    }
+
+    const doc = lib.add({
+      title: options.title,
+      content,
+      domain: options.domain,
+      source: options.file ? { file: options.file } : undefined,
+    });
+
+    console.log(`📚 Added to library: ${doc.id}`);
+    console.log(`   Title: ${doc.title}`);
+    console.log(`   Size: ${doc.meta.size} chars`);
+    console.log(`   Domain: ${doc.domain}`);
+  });
+
+program
+  .command('library-search')
+  .alias('lib-search')
+  .description('Search the knowledge library')
+  .argument('<query>', 'Search query')
+  .option('-n, --limit <n>', 'Max results', '10')
+  .action(async (query, options) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    const results = lib.search(query, parseInt(options.limit));
+
+    if (results.length === 0) {
+      console.log('No library documents match this query.');
+      return;
+    }
+
+    console.log(`📚 ${results.length} result(s) for "${query}":\n`);
+    for (const doc of results) {
+      console.log(`  [${doc.id}] ${doc.title}`);
+      console.log(`  ${doc.content.slice(0, 150).replace(/\n/g, ' ')}...`);
+      console.log(
+        `  domain: ${doc.domain} | size: ${doc.meta.size}c | used: ${doc.meta.usage_count}×\n`,
+      );
+    }
+  });
+
+program
+  .command('library-list')
+  .alias('lib-list')
+  .description('List all documents in the knowledge library')
+  .action(async () => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+    const { totalSize } = lib.stats;
+
+    const docs = lib.list();
+    console.log(`📚 ${docs.length} document(s) | ${(totalSize / 1024).toFixed(1)} KB total\n`);
+    for (const doc of docs) {
+      console.log(`  [${doc.id}] ${doc.title}`);
+      console.log(`  domain: ${doc.domain} | ${doc.meta.size}c | ${doc.meta.usage_count}× read\n`);
+    }
+  });
+
+program
+  .command('library-get')
+  .alias('lib-get')
+  .description('Get full content of a library document')
+  .argument('<id>', 'Document ID')
+  .action(async (id) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    const doc = lib.get(id);
+    if (!doc) {
+      console.log(`❌ Document not found: ${id}`);
+      return;
+    }
+
+    console.log(`📚 ${doc.title} [${doc.id}]`);
+    console.log(`domain: ${doc.domain} | size: ${doc.meta.size}c\n`);
+    console.log(doc.content);
+  });
+
+program
+  .command('library-remove')
+  .alias('lib-rm')
+  .description('Remove a document from the knowledge library')
+  .argument('<id>', 'Document ID')
+  .action(async (id) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    if (lib.remove(id)) {
+      console.log(`🗑️  Removed: ${id}`);
+    } else {
+      console.log(`❌ Document not found: ${id}`);
+    }
   });
 
 program.parse();
@@ -930,73 +1056,236 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
   return agents;
 }
 
-/** Generate MIGRATION.md for an agent session domain */
-function generateMigrationGuide(gridDir: string): void {
-  const guide = [
-    '# Memory Migration Guide',
-    '',
-    'This guide explains how to migrate your existing memory system',
-    'into this MemGrid session domain.',
-    '',
-    '## What MemGrid expects',
-    '',
-    'Each memory is stored as a JSON file. Use the `memgrid_add` MCP tool',
-    'or `memgrid add` CLI to write memories.',
-    '',
-    '### Memory unit structure (v0.10 — lightweight index cards)',
-    '',
-    '```json',
-    '{',
-    '  "type": "method|pattern|error_solution|decision|style_preference|...",',
-    '  "summary": "One-line summary of what this memory represents",',
-    '  "description": "Detailed description",',
-    '  "sourceFile": "(optional) source file path"',
-    '}',
-    '```',
-    '',
-    '### Memory types',
-    '',
-    '| Type | Use for |',
-    '|------|--------|',
-    '| `method` | A function or method signature |',
-    '| `pattern` | Design pattern or recurring convention |',
-    '| `error_solution` | A bug and how it was fixed |',
-    '| `decision` | A code decision and its rationale |',
-    '| `style_preference` | A coding style preference |',
-    '| `rule_trigger` | When to apply a specific rule |',
-    '| `architecture_principle` | An architecture red line |',
-    '',
-    '## Migration steps',
-    '',
-    '1. Read your existing memory files (identify the format they use)',
-    '2. For each memory unit, map it to the closest MemGrid type above',
-    '3. Write it via `memgrid_add` with `status: "active"`',
-    '4. Run `memgrid rebalance` to assign storage tiers',
-    '5. Run `memgrid stats` to verify the migration count',
-    '',
-    '## Example type mapping',
-    '',
-    'If your existing memory system uses different type names, map them:',
-    '',
-    '| Your type | MemGrid type |',
-    '|-----------|-------------|',
-    '| event / log | `decision` |',
-    '| knowledge / fact | `pattern` |',
-    '| mistake / bug-fix | `error_solution` |',
-    '| rule / convention | `rule_trigger` |',
-    '| preference / habit | `style_preference` |',
-    '',
-    '## After migration',
-    '',
-    '- Run `memgrid review` to verify migrated memories',
-    '- Run `memgrid conflicts` to check for contradictions',
-    '- Tell your agent: "My memory system is now MemGrid-managed."',
-    '',
-    'Managed by MemGrid — this guide is generated during `memgrid init --server`.',
-  ];
+/**
+ * Auto-migrate existing OpenClaw memory files into MemGrid.
+ *
+ * Detects MEMORY.md, memory/** / *.md, memory/daily/*.md.
+ * Short content (≤500 chars) → memory unit.
+ * Long content (>500 chars) → library document + memory unit with library_ref.
+ * Original files preserved (not deleted).
+ */
+interface MigrationResult {
+  total: number;
+  memoryUnits: number;
+  libraryDocs: number;
+  skipped: number;
+}
 
-  const guidePath = path.join(gridDir, 'MIGRATION.md');
-  fs.writeFileSync(guidePath, guide.join('\n'), 'utf-8');
+function migrateExistingMemories(dm: DomainManager): MigrationResult {
+  const result: MigrationResult = { total: 0, memoryUnits: 0, libraryDocs: 0, skipped: 0 };
+
+  // Find the OpenClaw workspaces directory
+  const workspacesDir = path.join(os.homedir(), '.openclaw');
+  const workspaceDirs = fs
+    .readdirSync(workspacesDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.startsWith('workspace-'))
+    .map((d) => path.join(workspacesDir, d.name));
+
+  for (const wsDir of workspaceDirs) {
+    // Find agent matching this workspace
+    const agent = dm.listDomains().find((d) => {
+      try {
+        const agentFile = path.join(dm.gridDir, 'sessions', d.name, 'agent.json');
+        if (fs.existsSync(agentFile)) {
+          const cfg = JSON.parse(fs.readFileSync(agentFile, 'utf-8'));
+          return cfg.purpose && wsDir.includes(cfg.purpose);
+        }
+      } catch {
+        /* agent.json parse error — skip */
+      }
+      return false;
+    });
+    if (!agent) continue;
+
+    const sessionDir = path.join(dm.gridDir, 'sessions', agent.name);
+
+    // Scan memory files in workspace
+    const memoryFiles = findMemoryFiles(wsDir);
+
+    for (const mf of memoryFiles) {
+      try {
+        const content = fs.readFileSync(mf, 'utf-8');
+        if (content.trim().length === 0) {
+          result.skipped++;
+          continue;
+        }
+
+        const title = path.basename(mf).replace(/\.[^.]+$/, '');
+        const sourceFile = path.relative(os.homedir(), mf);
+
+        if (content.length <= 500) {
+          // Short content → memory unit directly
+          const id = `migrated_${agent.name}_${title.replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
+          const unitPath = path.join(sessionDir, '.memgrid', 'units', `${id}.json`);
+
+          // Skip if already migrated
+          if (fs.existsSync(unitPath)) {
+            result.skipped++;
+            continue;
+          }
+
+          const unit: MemoryUnit = {
+            id,
+            type: inferType(title, content),
+            summary: title.slice(0, 80),
+            narrative: content,
+            keywords: extractKeywords(content),
+            source: { file: sourceFile, type: 'markdown' },
+            signatures: [],
+            associations: [],
+            meta: {
+              created: new Date().toISOString(),
+              updated: new Date().toISOString(),
+              confidence: 0.7,
+              usage_count: 0,
+              status: 'active',
+              tier: 'warm',
+            },
+            provenance: {
+              createdBy: 'memgrid:migration',
+              basedOnTask: `Auto-migrated from ${sourceFile}`,
+              timestamp: new Date().toISOString(),
+            },
+          };
+
+          fs.mkdirSync(path.dirname(unitPath), { recursive: true });
+          fs.writeFileSync(unitPath, JSON.stringify(unit, null, 2), 'utf-8');
+          result.memoryUnits++;
+        } else {
+          // Long content → library + memory unit with library_ref
+          const libId = `lib_migrated_${title.replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
+          const libPath = path.join(sessionDir, '.memgrid', 'library', `${libId}.json`);
+
+          // Skip if already migrated
+          if (fs.existsSync(libPath)) {
+            result.skipped++;
+            continue;
+          }
+
+          // Store in library
+          const libUnit: LibraryUnit = {
+            id: libId,
+            title,
+            content,
+            source: { file: sourceFile, type: 'memory', migratedAt: new Date().toISOString() },
+            keywords: extractKeywords(content),
+            domain: agent.name,
+            meta: {
+              created: new Date().toISOString(),
+              updated: new Date().toISOString(),
+              size: content.length,
+              usage_count: 0,
+              status: 'active',
+            },
+          };
+
+          fs.mkdirSync(path.dirname(libPath), { recursive: true });
+          fs.writeFileSync(libPath, JSON.stringify(libUnit, null, 2), 'utf-8');
+          result.libraryDocs++;
+
+          // Create memory unit pointing to library
+          const unitId = `migrated_${agent.name}_${title.replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
+          const unitPath = path.join(sessionDir, '.memgrid', 'units', `${unitId}.json`);
+
+          const unit: MemoryUnit = {
+            id: unitId,
+            type: inferType(title, content),
+            summary: title.slice(0, 80),
+            narrative: content.slice(0, 500),
+            keywords: extractKeywords(content),
+            library_ref: libId,
+            source: { file: sourceFile, type: 'library' },
+            signatures: [],
+            associations: [],
+            meta: {
+              created: new Date().toISOString(),
+              updated: new Date().toISOString(),
+              confidence: 0.7,
+              usage_count: 0,
+              status: 'active',
+              tier: 'warm',
+            },
+            provenance: {
+              createdBy: 'memgrid:migration',
+              basedOnTask: `Auto-migrated from ${sourceFile}. Full text: memgrid lib-get ${libId}`,
+              timestamp: new Date().toISOString(),
+            },
+          };
+
+          fs.writeFileSync(unitPath, JSON.stringify(unit, null, 2), 'utf-8');
+          result.memoryUnits++;
+        }
+
+        result.total++;
+      } catch (e) {
+        console.log(`  ⚠️  Skipped ${mf}: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  return result;
+}
+
+/** Find existing memory files in a workspace directory */
+function findMemoryFiles(workspaceDir: string): string[] {
+  const files: string[] = [];
+  const memPath = path.join(workspaceDir, 'MEMORY.md');
+  const memoryDir = path.join(workspaceDir, 'memory');
+
+  if (fs.existsSync(memPath)) files.push(memPath);
+
+  if (fs.existsSync(memoryDir)) {
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (entry.name.endsWith('.md')) {
+          files.push(full);
+        }
+      }
+    };
+    walk(memoryDir);
+  }
+
+  return files;
+}
+
+/** Infer memory type from filename and content */
+function inferType(title: string, _content: string): MemoryUnitType {
+  const lower = title.toLowerCase();
+  if (lower.includes('preference') || lower.includes('habit') || lower.includes('prefer'))
+    return 'preference';
+  if (
+    lower.includes('event') ||
+    lower.includes('log') ||
+    lower.includes('202') ||
+    lower.includes('daily')
+  )
+    return 'event';
+  if (
+    lower.includes('decision') ||
+    lower.includes('choice') ||
+    lower.includes('mistake') ||
+    lower.includes('error')
+  )
+    return 'insight';
+  if (lower.includes('config') || lower.includes('tech') || lower.includes('api')) return 'fact';
+  return 'insight';
+}
+
+/** Simple keyword extraction from text */
+function extractKeywords(text: string): string[] {
+  const words = text
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((w) => w.length > 3);
+  const freq: Record<string, number> = {};
+  for (const w of words) freq[w] = (freq[w] || 0) + 1;
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([w]) => w);
 }
 
 /** Auto-register MemGrid MCP server in OpenClaw Gateway's openclaw.json */

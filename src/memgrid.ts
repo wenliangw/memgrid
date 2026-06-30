@@ -4,6 +4,7 @@ import * as path from 'path';
 import type {
   MemoryUnit,
   MemoryUnitType,
+  LegacyMemoryUnitType,
   MemoryTier,
   ScanOptions,
   SearchOptions,
@@ -14,6 +15,7 @@ import type {
   ConflictResult,
   RebalanceResult,
 } from './shared/types.js';
+import { LEGACY_TYPE_MAP } from './shared/types.js';
 import { FileStore } from './store/file-store.js';
 import {
   TypeScriptScanner,
@@ -30,6 +32,7 @@ import {
 } from './retrieve/semantic.js';
 import { LearnEngine, type TaskResult, type LearningSuggestions } from './learn/index.js';
 import { SyncEngine } from './sync/index.js';
+import { LibraryManager } from './library/index.js';
 
 export class MemGrid {
   store: FileStore;
@@ -38,6 +41,7 @@ export class MemGrid {
   semantic: SemanticRetriever;
   learn: LearnEngine;
   syncEngine: SyncEngine;
+  library: LibraryManager;
   projectRoot: string;
 
   constructor(projectRoot: string, provider?: EmbeddingProvider, scanner?: Scanner) {
@@ -55,6 +59,7 @@ export class MemGrid {
     this.semantic = new SemanticRetriever(this.store, provider || new KeywordEmbeddingProvider());
     this.learn = new LearnEngine(this.store);
     this.syncEngine = new SyncEngine(this.store, this.scanner, projectRoot);
+    this.library = new LibraryManager(path.join(projectRoot, '.memgrid'));
   }
 
   async init(options: ScanOptions): Promise<MemoryUnit[]> {
@@ -190,12 +195,20 @@ export class MemGrid {
       id: string;
       type: MemoryUnit['type'];
       summary: string;
-      content: MemoryUnit['content'];
+      narrative?: string;
     },
   ): Promise<MemoryUnit> {
+    // Auto-upgrade legacy types to new cognitive types
+    const legacyType = unit.type as string;
+    const normalizedType: MemoryUnitType =
+      LEGACY_TYPE_MAP[legacyType as LegacyMemoryUnitType] ?? (unit.type as MemoryUnitType);
+
     const fullUnit: MemoryUnit = {
       ...unit,
+      type: normalizedType,
+      narrative: unit.narrative || '',
       signatures: unit.signatures || [],
+      keywords: unit.keywords || [],
       associations: unit.associations || [],
       meta: {
         created: new Date().toISOString(),
@@ -240,13 +253,7 @@ export class MemGrid {
     const conflicts: ConflictResult[] = [];
 
     // Group by type — only some types can meaningfully conflict
-    const conflictTypes: MemoryUnitType[] = [
-      'style_preference',
-      'architecture_principle',
-      'pattern',
-      'error_solution',
-      'decision',
-    ];
+    const conflictTypes: MemoryUnitType[] = ['preference', 'insight'];
 
     for (const cType of conflictTypes) {
       const group = units.filter(
@@ -282,13 +289,13 @@ export class MemGrid {
    */
   private keywordOverlap(a: MemoryUnit, b: MemoryUnit): number {
     const tokensA = new Set(
-      `${a.summary} ${a.content.description}`
+      `${a.summary} ${a.narrative}`
         .toLowerCase()
         .split(/\W+/)
         .filter((t) => t.length > 2),
     );
     const tokensB = new Set(
-      `${b.summary} ${b.content.description}`
+      `${b.summary} ${b.narrative}`
         .toLowerCase()
         .split(/\W+/)
         .filter((t) => t.length > 2),
@@ -484,7 +491,7 @@ export class MemGrid {
 
     const clueLower = clue.toLowerCase();
     return frozen.filter((u) => {
-      const text = `${u.summary} ${u.signatures.join(' ')} ${u.content.description}`.toLowerCase();
+      const text = `${u.summary} ${u.signatures.join(' ')} ${u.narrative}`.toLowerCase();
       return text.includes(clueLower);
     });
   }
@@ -494,27 +501,19 @@ export class MemGrid {
    * Higher score = more worth keeping in cold (not freezing).
    * Lower score = freeze first.
    */
+  /**
+   * Calculate retention score for a memory unit.
+   * All types treated equally — retention depends on confidence, usage, and connectivity.
+   */
   private retentionScore(unit: MemoryUnit): number {
-    const typeWeights: Record<string, number> = {
-      method: 0.9,
-      component: 0.9,
-      config: 0.8,
-      rule_trigger: 0.8,
-      architecture_principle: 0.8,
-      pattern: 0.6,
-      error_solution: 0.5,
-      decision: 0.4,
-      style_preference: 0.3,
-      skill_trigger: 0.5,
-      mcp_trigger: 0.5,
-    };
-
-    const typeWeight = typeWeights[unit.type] ?? 0.5;
     const confidenceFactor = unit.meta.confidence;
-    const usageFactor = Math.min(1, unit.meta.usage_count / 10); // cap at 10
-    const hasAssociations = unit.associations.length > 0 ? 0.5 : 0; // being referenced matters
+    const usageFactor = Math.min(1, unit.meta.usage_count / 10);
+    const hasAssociations = unit.associations.length > 0 ? 0.5 : 0;
+    const richnessFactor = Math.min(1, (unit.narrative?.length || 0) / 500);
 
-    return confidenceFactor * 0.3 + usageFactor * 0.3 + typeWeight * 0.2 + hasAssociations * 0.2;
+    return (
+      confidenceFactor * 0.35 + usageFactor * 0.25 + hasAssociations * 0.25 + richnessFactor * 0.15
+    );
   }
 
   context(result: SearchResult): string {

@@ -350,7 +350,7 @@ export class SyncEngine {
 
               units.push({
                 id: `method_${this.sanitizeId(signature)}`,
-                type: 'method',
+                type: 'fact',
                 summary: `${signature} — ${this.extractJsDoc(method)}`,
                 source: {
                   file,
@@ -388,7 +388,7 @@ export class SyncEngine {
 
             units.push({
               id: `method_${this.sanitizeId(funcName)}`,
-              type: 'method',
+              type: 'fact',
               summary: `${funcName}() — ${this.extractJsDoc(func)}`,
               source: { file, lines: `${func.getStartLineNumber()}-${func.getEndLineNumber()}` },
               signatures: [funcName],
@@ -448,7 +448,7 @@ export class SyncEngine {
 
           units.push({
             id: `rule_${safeFile}_${safeTitle}`,
-            type: 'pattern',
+            type: 'insight',
             summary: `${path.basename(file).replace('.md', '')}: ${title}`,
             source: { file },
             signatures: [title, path.basename(file).replace('.md', '').replace(/-/g, ' ')],
@@ -467,7 +467,7 @@ export class SyncEngine {
         // Rule trigger
         units.push({
           id: `trigger_rule_${safeFile}`,
-          type: 'rule_trigger',
+          type: 'preference',
           summary: `When working on ${path.basename(file).replace('.md', '').replace(/-/g, ' ')} → load ${file}`,
           source: { file },
           signatures: [path.basename(file).replace('.md', '').replace(/-/g, ' ')],
@@ -509,7 +509,7 @@ export class SyncEngine {
         if (keyDeps.length > 0) {
           units.push({
             id: 'config_tech_stack',
-            type: 'config',
+            type: 'fact',
             summary: `Tech stack: ${keyDeps.slice(0, 8).join(', ')}`,
             source: { file: 'package.json' },
             signatures: ['tech stack', 'dependencies', '技术栈'],
@@ -579,10 +579,10 @@ export class SyncEngine {
       }
 
       // Signal 4: Code snippet Jaccard content
-      if (newUnit.content.code_snippet && stale.content.code_snippet) {
+      if (newUnit.content?.code_snippet && stale.content?.code_snippet) {
         const codeScore = jaccardBigramSimilarity(
-          newUnit.content.code_snippet.toLowerCase(),
-          stale.content.code_snippet.toLowerCase(),
+          newUnit.content.code_snippet!.toLowerCase(),
+          stale.content.code_snippet!.toLowerCase(),
         );
         // Code similarity is weaker (could be different impl same signature)
         score = Math.max(score, codeScore * 0.4);

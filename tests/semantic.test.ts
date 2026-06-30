@@ -16,10 +16,11 @@ describe('SemanticRetriever', () => {
 
   const makeUnit = (id: string, summary: string, description: string) => ({
     id,
-    type: 'method' as const,
+    type: 'fact' as const,
     summary,
+    narrative: description,
+    keywords: [],
     signatures: [id],
-    content: { description },
     associations: [],
     meta: {
       created: new Date().toISOString(),
@@ -83,7 +84,7 @@ describe('SemanticRetriever', () => {
 
     const result = await retriever.search('auth');
     const ctx = retriever.toContext(result);
-    expect(ctx).toContain('MemGrid Context');
+    expect(ctx).toContain('Found');
     expect(ctx).toContain('u1');
   });
 

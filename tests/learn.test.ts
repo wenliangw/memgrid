@@ -21,7 +21,7 @@ describe('LearnEngine', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('suggests error_solution when errors encountered', async () => {
+  it('suggests insight when errors encountered', async () => {
     const result = await engine.analyze({
       summary: 'Fix GLM OOM error',
       outcome: 'Switched to DeepSeek V4 Pro',
@@ -30,7 +30,7 @@ describe('LearnEngine', () => {
     });
 
     expect(result.add.length).toBeGreaterThan(0);
-    expect(result.add.some((u) => u.type === 'error_solution')).toBe(true);
+    expect(result.add.some((u) => u.type === 'insight')).toBe(true);
   });
 
   it('suggests decision units for design decisions', async () => {
@@ -41,7 +41,7 @@ describe('LearnEngine', () => {
       decisions: ['Delete should return true not null for semantic clarity'],
     });
 
-    expect(result.add.some((u) => u.type === 'decision')).toBe(true);
+    expect(result.add.some((u) => u.type === 'insight')).toBe(true);
   });
 
   it('suggests triggers for tools used', async () => {
@@ -52,7 +52,7 @@ describe('LearnEngine', () => {
       toolsUsed: ['chakra-ui MCP'],
     });
 
-    expect(result.add.some((u) => u.type === 'skill_trigger')).toBe(true);
+    expect(result.add.some((u) => u.type === 'event')).toBe(true);
   });
 
   it('suggests style preferences', async () => {
@@ -63,17 +63,18 @@ describe('LearnEngine', () => {
       styleObservations: ['Prefer functional pipes over for loops'],
     });
 
-    expect(result.add.some((u) => u.type === 'style_preference')).toBe(true);
+    expect(result.add.some((u) => u.type === 'preference')).toBe(true);
   });
 
   it('flags existing method units as stale when their files are modified', async () => {
     // Add a method unit pointing to a file
     store.saveUnit({
       id: 'test_method',
-      type: 'method',
+      type: 'fact',
       summary: 'Old create method',
       signatures: ['OldClass.create'],
-      content: { description: 'Old implementation' },
+      narrative: 'Old implementation',
+      keywords: [],
       source: { file: 'src/old-service.ts' },
       associations: [],
       meta: {
@@ -102,8 +103,8 @@ describe('LearnEngine', () => {
     });
 
     // Only the new file flag, no errors/decisions/styles/tools
-    expect(result.add.filter((u) => u.type === 'method').length).toBe(1);
-    expect(result.add.filter((u) => u.type !== 'method').length).toBe(0);
+    expect(result.add.filter((u) => u.type === 'fact').length).toBe(1);
+    expect(result.add.filter((u) => u.type !== 'fact').length).toBe(0);
   });
 
   it('apply saves units to store', async () => {
@@ -119,6 +120,6 @@ describe('LearnEngine', () => {
 
     // Verify unit was saved (v0.8: default candidate, need includeCandidate)
     const units = await store.listUnits({ includeCandidate: true });
-    expect(units.some((u) => u.type === 'error_solution')).toBe(true);
+    expect(units.some((u) => u.type === 'insight')).toBe(true);
   });
 });

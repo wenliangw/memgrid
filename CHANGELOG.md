@@ -2,6 +2,55 @@
 
 All notable changes to MemGrid.
 
+## v0.10.0-beta.4 — Auto Migration + Extract Engine (2026-06-30)
+
+### Added
+- **Auto-migration**: `memgrid init --server` now automatically detects existing
+  OpenClaw memory files (MEMORY.md, memory/**/*.md) and migrates them:
+  - Short content (≤500 chars) → memory unit
+  - Long content (>500 chars) → library document + memory unit with `library_ref`
+  - Original files preserved (not deleted)
+  - Skips already-migrated content (idempotent)
+  - Migration report on completion
+- **smart type inference**: auto-detects fact/insight/event/preference from filename
+  and content patterns during migration
+- **keyword extraction**: automatic TF-based keyword generation for migrated content
+
+### Removed
+- Static `MIGRATION.md` guide — replaced by automatic migration
+
+---
+
+## v0.10.0-beta.3 — Cognitive Type System + Library (2026-06-30)
+
+### Breaking Changes
+- **Unit type system refactored**: 11 code-metaphor types (method|pattern|config|...) → 4 cognitive types: `fact` | `insight` | `event` | `preference`
+  - Legacy types still accepted (auto-mapped on write: method→fact, decision→insight, etc.)
+  - Auto-migration in FileStore: old units loaded from disk are upgraded automatically
+- **Unit structure simplified**:
+  - New `narrative` field replaces `content.description` — natural language story of the memory
+  - `code_snippet` promoted to top-level field
+  - `keywords` added for lightweight indexing
+  - Old `content.*` fields (inputs/outputs/dependencies/style_notes/trigger/action) deprecated but still accepted
+- **retentionScore no longer weights by unit type** — all types treated equally, retention based on confidence × usage × connectivity × narrative richness
+- **RelationType expanded**: adds `caused_by`, `causes`, `related_to`, `references`, `contradicts`, `supersedes` alongside legacy types
+
+### Added
+- **Library (knowledge base)**: new `src/library/` module — stores full documents, separate from memory units
+  - `LibraryManager`: add/search/get/list/remove with MiniSearch full-text index
+  - CLI: `memgrid library-add` (alias `lib-add`), `library-search` (`lib-search`), `library-list`, `library-get`, `library-remove`
+  - Integrated into `MemGrid` class as `mg.library`
+  - Memory units can reference library docs via `library_ref` field
+  - Backward compat: `content?` field on MemoryUnit for legacy scanner output
+
+### Changed
+- **DomainType**: relaxed from enum to `'personality' | string` — domains derive meaning from content, not labels
+- NLP parser (`learn/nlp.ts`): updated type detection to use new cognitive types
+- Conflict detection: simplified to only check `preference` and `insight` types
+- All scanners, sync phases, retrieve engine, MCP server, and CLI adapted to new type system
+
+---
+
 ## v0.10.0 — Multi-Domain Architecture (2026-06-30)
 
 ### Added

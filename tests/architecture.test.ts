@@ -8,7 +8,7 @@ import * as os from 'os';
 function makeMemoryUnit(overrides: Partial<MemoryUnit> = {}): MemoryUnit {
   return {
     id: 'test_id',
-    type: 'architecture_principle',
+    type: 'preference',
     summary: 'Test principle',
     signatures: [],
     content: { description: 'Test' },
@@ -94,7 +94,7 @@ describe('checkArchitecture (Phase 5)', () => {
 
     const principle: MemoryUnit = makeMemoryUnit({
       id: 'principle_no_forwardref',
-      type: 'architecture_principle',
+      type: 'preference',
       summary: '禁止 forwardRef 绕过循环引用',
       content: {
         description: '禁止 forwardRef() 补丁式修复，应该拆 barrel export',
