@@ -1,5 +1,5 @@
 import MiniSearch from 'minisearch';
-import type { MemoryUnit, SearchResult, Association } from '../shared/types.js';
+import type { MemoryUnit, SearchResult } from '../shared/types.js';
 import type { FileStore } from '../store/file-store.js';
 
 /**

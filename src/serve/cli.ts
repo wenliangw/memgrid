@@ -797,7 +797,7 @@ program
   .action(async () => {
     const gridDir = path.join(process.cwd(), '.memgrid');
     const lib = new LibraryManager(gridDir);
-    const { total, totalSize } = lib.stats;
+    const { totalSize } = lib.stats;
 
     const docs = lib.list();
     console.log(`📚 ${docs.length} document(s) | ${(totalSize / 1024).toFixed(1)} KB total\n`);
@@ -1084,7 +1084,7 @@ function migrateExistingMemories(dm: DomainManager): MigrationResult {
           const cfg = JSON.parse(fs.readFileSync(agentFile, 'utf-8'));
           return cfg.purpose && wsDir.includes(cfg.purpose);
         }
-      } catch {}
+      } catch { /* agent.json parse error — skip */ }
       return false;
     });
     if (!agent) continue;
