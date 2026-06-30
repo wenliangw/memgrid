@@ -116,6 +116,13 @@ export class MemGridServer {
                 type: 'string',
                 description: 'Style or usage notes',
               },
+              domain: {
+                type: 'string',
+                description:
+                  'Target domain. Use "personality" for cross-project preferences, ' +
+                  'project name (e.g. "septonir") for project-specific memories, ' +
+                  'or omit for current session domain.',
+              },
               status: {
                 type: 'string',
                 description:
@@ -307,7 +314,7 @@ export class MemGridServer {
 
           case 'memgrid_add': {
             let { summary, description } = args as any;
-            const { sourceFile, codeSnippet, _styleNotes, associations, status } = args as any;
+            const { sourceFile, codeSnippet, _styleNotes, associations, status, domain } = args as any;
             let { type } = args as any;
 
             // NLP auto-detect: if no type provided, parse from description
@@ -341,6 +348,7 @@ export class MemGridServer {
             const unit = await this.mg.add({
               id,
               type: type,
+              domain: domain || undefined,
               summary,
               narrative: description || summary,
               code_snippet: codeSnippet,
