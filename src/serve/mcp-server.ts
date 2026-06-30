@@ -302,8 +302,7 @@ export class MemGridServer {
         },
         {
           name: 'memgrid_archive',
-          description:
-            'Archive a memory unit (mark as inactive, excluded from search results).',
+          description: 'Archive a memory unit (mark as inactive, excluded from search results).',
           inputSchema: {
             type: 'object',
             properties: {
@@ -376,7 +375,8 @@ export class MemGridServer {
 
           case 'memgrid_add': {
             let { summary, description } = args as any;
-            const { sourceFile, codeSnippet, _styleNotes, associations, status, domain } = args as any;
+            const { sourceFile, codeSnippet, _styleNotes, associations, status, domain } =
+              args as any;
             let { type } = args as any;
 
             // NLP auto-detect: if no type provided, parse from description
