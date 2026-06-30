@@ -246,6 +246,34 @@ export class MemGridServer {
             required: ['unitId'],
           },
         },
+        {
+          name: 'memgrid_extract',
+          description:
+            'Extract memory candidates from conversation text. ' +
+            'Uses rule-based pattern matching (always available) to identify ' +
+            'decisions, preferences, events, and facts. Returns candidates ' +
+            'as draft units — review and accept via memgrid_review.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              conversation: {
+                type: 'string',
+                description: 'Conversation text to extract memories from',
+              },
+              domain: {
+                type: 'string',
+                description: 'Domain name to assign extracted units to',
+              },
+              autoAccept: {
+                type: 'boolean',
+                description:
+                  'If true, auto-accept high-confidence candidates (≥0.8). Default: false.',
+                default: false,
+              },
+            },
+            required: ['conversation'],
+          },
+        },
       ];
 
       return { tools };
@@ -603,6 +631,49 @@ export class MemGridServer {
             return {
               content: [{ type: 'text', text: `❌ Unit not found or not frozen: ${unitId}` }],
               isError: true,
+            };
+          }
+
+          case 'memgrid_extract': {
+            const { conversation, domain, autoAccept } = args as any;
+            const { raw } = this.mg.extract.extract(conversation || '');
+
+            if (raw.length === 0) {
+              return {
+                content: [{ type: 'text', text: 'No memory candidates extracted from conversation.' }],
+              };
+            }
+
+            const saved: string[] = [];
+            for (const candidate of raw) {
+              const status = autoAccept && candidate.confidence >= 0.8 ? 'active' : 'candidate';
+              const unit = this.mg.extract.toMemoryUnit(
+                candidate,
+                domain || 'conversation',
+                status,
+              );
+              // Check for near-duplicates before saving
+              const existing = this.mg.store.listUnitsSync({ includeCandidate: true }) || [];
+              const isDuplicate = existing.some(
+                (u) => u.summary.slice(0, 40).toLowerCase() === candidate.summary.slice(0, 40).toLowerCase(),
+              );
+              if (!isDuplicate) {
+                this.mg.store.saveUnit(unit);
+                saved.push(`${unit.id}: [${unit.type}] ${unit.summary}`);
+              }
+            }
+
+            const statusLabel = autoAccept ? ' (auto-accepted high-confidence)' : '';
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    `🧠 Extracted ${raw.length} candidate(s)${statusLabel}, saved ${saved.length} new unit(s):\n\n` +
+                    saved.map((s) => `  ${s}`).join('\n') +
+                    '\n\nUse memgrid_review to accept or reject candidates.',
+                },
+              ],
             };
           }
 

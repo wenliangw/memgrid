@@ -2,7 +2,31 @@
 
 All notable changes to MemGrid.
 
-## v0.10.0-beta.4 — Auto Migration + Extract Engine (2026-06-30)
+## v0.10.0-beta.5 — Extract Engine + Migration CLI (2026-06-30)
+
+### Added
+- **Extract Engine** (`src/extract/`): rule-based memory extraction from conversation text
+  - Detects decisions, preferences, events, and facts via keyword+pattern matching
+  - Chinese text support (中文句式识别)
+  - Auto-deduplication, keyword extraction, confidence scoring
+  - `memgrid_extract` MCP tool for Agent use
+  - `memgrid extract` CLI command
+  - LLM refinement prompt builder (for future LLM integration)
+  - 11 tests covering: decision/preference/event/fact extraction, Chinese, dedup, auto-accept
+- **`memgrid migrate` CLI command**: migrate existing long documents (>500 chars) to library
+  - `--source <path>` to scan .md files
+  - `--domain <name>` target domain
+  - `--dry-run` preview mode
+  - Auto-updates memory units with `library_ref`
+- **ExtractEngine** integrated into `MemGrid` class
+
+### Changed
+- MCP server: added `memgrid_extract` tool with conversation/domain/autoAccept params
+- MemGrid class: new `extract` property (ExtractEngine instance)
+
+---
+
+## v0.10.0-beta.4 — Auto Migration (2026-06-30)
 
 ### Added
 - **Auto-migration**: `memgrid init --server` now automatically detects existing

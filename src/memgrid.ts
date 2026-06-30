@@ -33,6 +33,8 @@ import {
 import { LearnEngine, type TaskResult, type LearningSuggestions } from './learn/index.js';
 import { SyncEngine } from './sync/index.js';
 import { LibraryManager } from './library/index.js';
+import { ExtractEngine } from './extract/index.js';
+
 
 export class MemGrid {
   store: FileStore;
@@ -42,6 +44,7 @@ export class MemGrid {
   learn: LearnEngine;
   syncEngine: SyncEngine;
   library: LibraryManager;
+  extract: ExtractEngine;
   projectRoot: string;
 
   constructor(projectRoot: string, provider?: EmbeddingProvider, scanner?: Scanner) {
@@ -60,6 +63,7 @@ export class MemGrid {
     this.learn = new LearnEngine(this.store);
     this.syncEngine = new SyncEngine(this.store, this.scanner, projectRoot);
     this.library = new LibraryManager(path.join(projectRoot, '.memgrid'));
+    this.extract = new ExtractEngine();
   }
 
   async init(options: ScanOptions): Promise<MemoryUnit[]> {
