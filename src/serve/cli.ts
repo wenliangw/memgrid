@@ -122,6 +122,13 @@ program
             const agentsMdPath = path.join(agent.workspaceDir, 'AGENTS.md');
             if (fs.existsSync(agentsMdPath)) {
               injectMemGridAgentsBlock(agentsMdPath, agent.name);
+
+              // Ingest existing preferences/rules from AGENTS.md into memory
+              const sessionDir = path.join(dm.gridDir, 'sessions', agent.name);
+              const ingestResult = ingestRulesFromDoc(agentsMdPath, agent.name, sessionDir);
+              if (ingestResult.ingested > 0) {
+                console.log(`     📋 Ingested ${ingestResult.ingested} rule(s) from AGENTS.md`);
+              }
             }
           }
         }
@@ -302,6 +309,15 @@ program
 
     // Inject CLAUDE.md block
     injectClaudeMdBlock(root, domainName);
+
+    // Ingest existing rules from CLAUDE.md into memory domain
+    const claudeMdPath = path.join(root, 'CLAUDE.md');
+    if (fs.existsSync(claudeMdPath)) {
+      const ingestResult = ingestRulesFromDoc(claudeMdPath, domainName, domainPath);
+      if (ingestResult.ingested > 0) {
+        console.log(`  📋 Ingested ${ingestResult.ingested} rule(s) from CLAUDE.md`);
+      }
+    }
 
     // Create domain README for other AI tools
     const readmePath = path.join(domainPath, 'README.md');
@@ -965,29 +981,23 @@ function injectClaudeMdBlock(projectRoot: string, domainName: string): void {
     '',
     '## 🧠 Project Memory (MemGrid)',
     '',
-    `This project uses MemGrid for persistent memory. Search before each task to understand the codebase context.`,
+    `This project uses MemGrid for persistent memory. Search before each task.`,
     '',
-    '### How to use',
-    '',
-    '**Before starting a task:**',
+    '### Usage',
     '```bash',
-    'npx memgrid search "your task description" --max 10',
-    '```',
+    '# Search before starting work',
+    'npx memgrid search "your task" --max 10',
     '',
-    '**Or use the MCP tool:** Call `memgrid_search` directly in conversation.',
-    '',
-    '**After completing code changes:**',
-    '```bash',
+    '# Sync after code changes',
     'npx memgrid sync',
     '```',
     '',
-    'Memory is stored in `.memgrid/`. It auto-syncs via hooks. Candidate learnings need manual review via `memgrid review`.',
+    'MCP tools: `memgrid_search`, `memgrid_add`, `memgrid_extract`, `memgrid_review`',
     '',
     '<!-- MEMGRID:END -->',
   ].join('\n');
 
   if (!fs.existsSync(claudeMdPath)) {
-    // Create new CLAUDE.md with MemGrid block
     fs.writeFileSync(claudeMdPath, `# ${domainName}\n${block}\n`, 'utf-8');
     console.log('  CLAUDE.md: created with MemGrid instructions');
     return;
@@ -995,12 +1005,127 @@ function injectClaudeMdBlock(projectRoot: string, domainName: string): void {
 
   const existing = fs.readFileSync(claudeMdPath, 'utf-8');
   if (existing.includes('<!-- MEMGRID:START -->')) {
-    console.log('  CLAUDE.md: MemGrid block already exists');
+    // Update if outdated (missing memgrid_extract)
+    if (existing.includes('memgrid_extract')) {
+      console.log('  CLAUDE.md: MemGrid block already up-to-date');
+      return;
+    }
+    const startIdx = existing.indexOf('<!-- MEMGRID:START -->');
+    const endIdx = existing.indexOf('<!-- MEMGRID:END -->');
+    if (endIdx > startIdx) {
+      const before = existing.slice(0, startIdx);
+      const after = existing.slice(endIdx + '<!-- MEMGRID:END -->'.length);
+      fs.writeFileSync(claudeMdPath, before + block + after, 'utf-8');
+      console.log('  CLAUDE.md: MemGrid block updated (old → new)');
+    }
     return;
   }
 
   fs.appendFileSync(claudeMdPath, block + '\n', 'utf-8');
   console.log('  CLAUDE.md: MemGrid block injected');
+}
+
+/**
+ * Ingest existing preferences and rules from an agent's doc (AGENTS.md or CLAUDE.md)
+ * into MemGrid. Parses sections like "Red Lines", "When Things Go Wrong", "Code Philosophy",
+ * "偏好", "规范" and writes them as preference/insight units.
+ */
+function ingestRulesFromDoc(
+  docPath: string,
+  domainName: string,
+  sessionDir: string,
+): { ingested: number } {
+  if (!fs.existsSync(docPath)) return { ingested: 0 };
+
+  const content = fs.readFileSync(docPath, 'utf-8');
+  const unitsDir = path.join(sessionDir, '.memgrid', 'units');
+  fs.mkdirSync(unitsDir, { recursive: true });
+
+  let ingested = 0;
+  const now = new Date().toISOString();
+
+  // Extract sections: "## Red Lines", "## Code Philosophy", "### 写入", etc.
+  const sections = [
+    { heading: 'Red Lines', type: 'preference' as const },
+    { heading: 'Code Philosophy', type: 'preference' as const },
+    { heading: 'When Things Go Wrong', type: 'preference' as const },
+    { heading: 'Self-Review', type: 'preference' as const },
+    { heading: 'Decision Review', type: 'insight' as const },
+    { heading: '偏好', type: 'preference' as const },
+    { heading: '规范', type: 'preference' as const },
+    { heading: '约定', type: 'preference' as const },
+    { heading: '习惯', type: 'preference' as const },
+    { heading: '原则', type: 'preference' as const },
+    { heading: '规则', type: 'preference' as const },
+    { heading: 'Red Lines', type: 'preference' as const },
+    { heading: '工具链', type: 'fact' as const },
+    { heading: 'Tech Stack', type: 'fact' as const },
+    { heading: '技术栈', type: 'fact' as const },
+    { heading: 'Architecture', type: 'fact' as const },
+    { heading: '架构', type: 'fact' as const },
+  ];
+
+  for (const { heading, type } of sections) {
+    // Match the section and extract bullet points until next heading or empty line
+    const sectionRe = new RegExp(
+      `(?:^#{1,4}\\s+${heading.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}[\\s\\S]*?)(?=\\n#{1,4}\\s|\\n\\n\\n|$)`,
+      'im',
+    );
+    const match = content.match(sectionRe);
+    if (!match) continue;
+
+    const sectionBody = match[0];
+    // Extract list items: "- xxx", "* xxx", numbered items
+    const items = sectionBody.match(/^\s*[-*]\s+(.+)$|^\s*\d+\.\s+(.+)$/gm);
+    if (!items || items.length === 0) continue;
+
+    for (const item of items) {
+      const text = item.replace(/^\s*[-*]\s+|^\s*\d+\.\s+/, '').trim();
+      if (text.length < 10 || text.startsWith('```') || text.startsWith('#')) continue;
+
+      const id = `ingested_${domainName}_${heading.replace(/\\s+/g, '_').toLowerCase()}_${ingested}`;
+      const unitPath = path.join(unitsDir, `${id}.json`);
+
+      // Skip if already ingested
+      if (fs.existsSync(unitPath)) continue;
+
+      const unit: MemoryUnit = {
+        id,
+        type,
+        domain: domainName,
+        summary: text.slice(0, 80),
+        narrative: `From ${path.basename(docPath)} "${heading}" section: ${text}`,
+        keywords: [
+          heading.toLowerCase(),
+          text
+            .toLowerCase()
+            .split(/\\s+/)
+            .find((w) => w.length > 3) || '',
+        ],
+        signatures: [],
+        associations: [],
+        meta: {
+          created: now,
+          updated: now,
+          confidence: 0.8,
+          usage_count: 0,
+          status: 'active',
+          tier: 'warm',
+        },
+        provenance: {
+          createdBy: 'memgrid:init-ingest',
+          basedOnTask: `Auto-ingested from ${path.basename(docPath)}`,
+          timestamp: now,
+        },
+        source: { file: docPath, type: 'markdown' },
+      };
+
+      fs.writeFileSync(unitPath, JSON.stringify(unit, null, 2), 'utf-8');
+      ingested++;
+    }
+  }
+
+  return { ingested };
 }
 
 /** Generate .memgrid/README.md for AI tool discoverability */
@@ -1456,12 +1581,8 @@ function registerOpenClawMcp(configPath: string, domainPath?: string): void {
 /** Inject MemGrid block into Agent's AGENTS.md (like CLAUDE.md for project mode) */
 function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void {
   const existing = fs.readFileSync(agentsMdPath, 'utf-8');
-  if (existing.includes('<!-- MEMGRID:START -->')) {
-    console.log(`     AGENTS.md: MemGrid block already exists`);
-    return;
-  }
 
-  const block = [
+  const newBlock = [
     '',
     '<!-- MEMGRID:START -->',
     '',
@@ -1505,6 +1626,26 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
     '<!-- MEMGRID:END -->',
   ];
 
-  fs.appendFileSync(agentsMdPath, block.join('\n') + '\n', 'utf-8');
+  const blockText = newBlock.join('\n') + '\n';
+
+  if (existing.includes('<!-- MEMGRID:START -->')) {
+    // Check if existing block is outdated (old version has memgrid_suggest, not memgrid_extract)
+    if (existing.includes('memgrid_extract')) {
+      console.log(`     AGENTS.md: MemGrid block already up-to-date`);
+      return;
+    }
+    // Replace old block with new block
+    const startIdx = existing.indexOf('<!-- MEMGRID:START -->');
+    const endIdx = existing.indexOf('<!-- MEMGRID:END -->');
+    if (endIdx > startIdx) {
+      const before = existing.slice(0, startIdx);
+      const after = existing.slice(endIdx + '<!-- MEMGRID:END -->'.length);
+      fs.writeFileSync(agentsMdPath, before + blockText.trimEnd() + after, 'utf-8');
+      console.log(`     AGENTS.md: MemGrid block updated (old → new)`);
+      return;
+    }
+  }
+
+  fs.appendFileSync(agentsMdPath, blockText, 'utf-8');
   console.log(`     AGENTS.md: MemGrid block injected for ${agentName}`);
 }
