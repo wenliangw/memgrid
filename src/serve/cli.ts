@@ -916,7 +916,9 @@ program
     if (options.dryRun) {
       console.log(`\n🔍 Dry run: ${migrated} file(s) would be migrated to library`);
     } else {
-      console.log(`\n✅ Migrated ${migrated} document(s) to library, ${updated} memory unit(s) updated with library_ref`);
+      console.log(
+        `\n✅ Migrated ${migrated} document(s) to library, ${updated} memory unit(s) updated with library_ref`,
+      );
     }
   });
 
