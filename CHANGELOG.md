@@ -2,6 +2,50 @@
 
 All notable changes to MemGrid.
 
+## v0.10.0 — Cognitive Memory Engine (2026-06-30)
+
+First stable release of the v0.10 architecture. Upgrades MemGrid from a project memory tool to a **personal cognitive grid engine** — one person, one grid, multiple domains.
+
+### Core Architecture
+- **Multi-domain**: personality (built-in) + project domains + agent session domains
+- **Domain de-typing**: domains derive meaning from content, not classification labels
+- **Two-layer memory**: memory grid (quick recall) + library (full documents)
+
+### Cognitive Type System
+- **4 cognitive types** replace 11 code-metaphor types: `fact` | `insight` | `event` | `preference`
+- Legacy types auto-mapped (method→fact, decision→insight, etc.)
+- `narrative` field replaces `content.description` — natural language story
+- `keywords` for lightweight indexing, `library_ref` for cross-referencing
+- `retentionScore` no longer weighted by type — purely confidence × usage × connectivity
+
+### Library (Knowledge Base)
+- Full document storage with MiniSearch full-text index
+- CLI: `memgrid library-add/search/list/get/remove`
+- `memgrid migrate` — batch-import long documents from existing memory files
+
+### Extract Engine
+- Rule-based memory extraction from conversation text
+- Chinese text support, auto-dedup, keyword extraction
+- `memgrid_extract` MCP tool + `memgrid extract` CLI
+- Agent self-refinement: agents refine their own extract results with full context
+
+### Auto-Migration
+- `memgrid init --server` detects MEMORY.md, memory/**/*.md
+- Short content → memory unit, long content → library
+- Idempotent, original files preserved
+
+### Integration
+- Claude Code: one-command setup via `memgrid init`
+- OpenClaw Gateway: `memgrid init --server` auto-detects agents
+- AGENTS.md injection template updated with extract + refine workflow
+
+### Polish
+- CLI version reads from package.json (no more hardcoded stale versions)
+- README rewritten — practical, no comparisons, real use cases
+- 91 tests, zero ESLint warnings
+
+---
+
 ## v0.10.0-beta.5 — Extract Engine + Migration CLI (2026-06-30)
 
 ### Added
