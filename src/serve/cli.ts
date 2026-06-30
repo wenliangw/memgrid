@@ -789,7 +789,7 @@ program
   .action(async () => {
     const gridDir = path.join(process.cwd(), '.memgrid');
     const lib = new LibraryManager(gridDir);
-    const { total, totalSize } = lib.stats;
+    const { totalSize } = lib.stats;
 
     const docs = lib.list();
     console.log(`📚 ${docs.length} document(s) | ${(totalSize / 1024).toFixed(1)} KB total\n`);

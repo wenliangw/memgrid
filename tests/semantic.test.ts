@@ -14,12 +14,13 @@ describe('SemanticRetriever', () => {
   let store: FileStore;
   let retriever: SemanticRetriever;
 
-  const makeUnit = (id: string, summary: string, description: string) => ({summary, narrative: description, keywords: [],
+  const makeUnit = (id: string, summary: string, description: string) => ({
     id,
     type: 'fact' as const,
     summary,
+    narrative: description,
+    keywords: [],
     signatures: [id],
-    narrative: description, keywords: [],
     associations: [],
     meta: {
       created: new Date().toISOString(),

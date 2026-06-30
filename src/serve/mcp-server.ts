@@ -6,7 +6,7 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { MemGrid } from '../memgrid.js';
-import type { MemoryUnitType, LegacyMemoryUnitType, LEGACY_TYPE_MAP } from '../shared/types.js';
+import type { MemoryUnitType, LegacyMemoryUnitType } from '../shared/types.js';
 
 const VALID_TYPES: MemoryUnitType[] = [
   'fact',
@@ -276,7 +276,7 @@ export class MemGridServer {
 
           case 'memgrid_add': {
             let { summary, description } = args as any;
-            const { sourceFile, codeSnippet, styleNotes, associations, status } = args as any;
+            const { sourceFile, codeSnippet, _styleNotes, associations, status } = args as any;
             let { type } = args as any;
 
             // NLP auto-detect: if no type provided, parse from description
