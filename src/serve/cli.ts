@@ -129,9 +129,7 @@ program
         // Auto-migrate existing OpenClaw memories into MemGrid
         const migResult = migrateExistingMemories(dm);
         if (migResult.total > 0) {
-          console.log(
-            `\n  📋 Auto-migrated ${migResult.total} existing memories:`,
-          );
+          console.log(`\n  📋 Auto-migrated ${migResult.total} existing memories:`);
           console.log(`     → ${migResult.memoryUnits} memory unit(s)`);
           console.log(`     → ${migResult.libraryDocs} library document(s)`);
           if (migResult.skipped > 0) {
@@ -786,7 +784,9 @@ program
     for (const doc of results) {
       console.log(`  [${doc.id}] ${doc.title}`);
       console.log(`  ${doc.content.slice(0, 150).replace(/\n/g, ' ')}...`);
-      console.log(`  domain: ${doc.domain} | size: ${doc.meta.size}c | used: ${doc.meta.usage_count}×\n`);
+      console.log(
+        `  domain: ${doc.domain} | size: ${doc.meta.size}c | used: ${doc.meta.usage_count}×\n`,
+      );
     }
   });
 
@@ -1058,58 +1058,72 @@ function detectOpenClawAgents(projectRoot: string): DetectedAgent[] {
 
 /**
  * Auto-migrate existing OpenClaw memory files into MemGrid.
- * 
+ *
  * Detects MEMORY.md, memory/** / *.md, memory/daily/*.md.
  * Short content (≤500 chars) → memory unit.
  * Long content (>500 chars) → library document + memory unit with library_ref.
  * Original files preserved (not deleted).
  */
-interface MigrationResult { total: number; memoryUnits: number; libraryDocs: number; skipped: number; }
+interface MigrationResult {
+  total: number;
+  memoryUnits: number;
+  libraryDocs: number;
+  skipped: number;
+}
 
 function migrateExistingMemories(dm: DomainManager): MigrationResult {
   const result: MigrationResult = { total: 0, memoryUnits: 0, libraryDocs: 0, skipped: 0 };
-  
+
   // Find the OpenClaw workspaces directory
   const workspacesDir = path.join(os.homedir(), '.openclaw');
-  const workspaceDirs = fs.readdirSync(workspacesDir, { withFileTypes: true })
-    .filter(d => d.isDirectory() && d.name.startsWith('workspace-'))
-    .map(d => path.join(workspacesDir, d.name));
+  const workspaceDirs = fs
+    .readdirSync(workspacesDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.startsWith('workspace-'))
+    .map((d) => path.join(workspacesDir, d.name));
 
   for (const wsDir of workspaceDirs) {
     // Find agent matching this workspace
-    const agent = dm.listDomains().find(d => {
+    const agent = dm.listDomains().find((d) => {
       try {
         const agentFile = path.join(dm.gridDir, 'sessions', d.name, 'agent.json');
         if (fs.existsSync(agentFile)) {
           const cfg = JSON.parse(fs.readFileSync(agentFile, 'utf-8'));
           return cfg.purpose && wsDir.includes(cfg.purpose);
         }
-      } catch { /* agent.json parse error — skip */ }
+      } catch {
+        /* agent.json parse error — skip */
+      }
       return false;
     });
     if (!agent) continue;
-    
+
     const sessionDir = path.join(dm.gridDir, 'sessions', agent.name);
-    
+
     // Scan memory files in workspace
     const memoryFiles = findMemoryFiles(wsDir);
-    
+
     for (const mf of memoryFiles) {
       try {
         const content = fs.readFileSync(mf, 'utf-8');
-        if (content.trim().length === 0) { result.skipped++; continue; }
-        
+        if (content.trim().length === 0) {
+          result.skipped++;
+          continue;
+        }
+
         const title = path.basename(mf).replace(/\.[^.]+$/, '');
         const sourceFile = path.relative(os.homedir(), mf);
-        
+
         if (content.length <= 500) {
           // Short content → memory unit directly
           const id = `migrated_${agent.name}_${title.replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
           const unitPath = path.join(sessionDir, '.memgrid', 'units', `${id}.json`);
-          
+
           // Skip if already migrated
-          if (fs.existsSync(unitPath)) { result.skipped++; continue; }
-          
+          if (fs.existsSync(unitPath)) {
+            result.skipped++;
+            continue;
+          }
+
           const unit: MemoryUnit = {
             id,
             type: inferType(title, content),
@@ -1133,7 +1147,7 @@ function migrateExistingMemories(dm: DomainManager): MigrationResult {
               timestamp: new Date().toISOString(),
             },
           };
-          
+
           fs.mkdirSync(path.dirname(unitPath), { recursive: true });
           fs.writeFileSync(unitPath, JSON.stringify(unit, null, 2), 'utf-8');
           result.memoryUnits++;
@@ -1141,10 +1155,13 @@ function migrateExistingMemories(dm: DomainManager): MigrationResult {
           // Long content → library + memory unit with library_ref
           const libId = `lib_migrated_${title.replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
           const libPath = path.join(sessionDir, '.memgrid', 'library', `${libId}.json`);
-          
+
           // Skip if already migrated
-          if (fs.existsSync(libPath)) { result.skipped++; continue; }
-          
+          if (fs.existsSync(libPath)) {
+            result.skipped++;
+            continue;
+          }
+
           // Store in library
           const libUnit: LibraryUnit = {
             id: libId,
@@ -1161,15 +1178,15 @@ function migrateExistingMemories(dm: DomainManager): MigrationResult {
               status: 'active',
             },
           };
-          
+
           fs.mkdirSync(path.dirname(libPath), { recursive: true });
           fs.writeFileSync(libPath, JSON.stringify(libUnit, null, 2), 'utf-8');
           result.libraryDocs++;
-          
+
           // Create memory unit pointing to library
           const unitId = `migrated_${agent.name}_${title.replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
           const unitPath = path.join(sessionDir, '.memgrid', 'units', `${unitId}.json`);
-          
+
           const unit: MemoryUnit = {
             id: unitId,
             type: inferType(title, content),
@@ -1194,18 +1211,18 @@ function migrateExistingMemories(dm: DomainManager): MigrationResult {
               timestamp: new Date().toISOString(),
             },
           };
-          
+
           fs.writeFileSync(unitPath, JSON.stringify(unit, null, 2), 'utf-8');
           result.memoryUnits++;
         }
-        
+
         result.total++;
       } catch (e) {
         console.log(`  ⚠️  Skipped ${mf}: ${(e as Error).message}`);
       }
     }
   }
-  
+
   return result;
 }
 
@@ -1214,9 +1231,9 @@ function findMemoryFiles(workspaceDir: string): string[] {
   const files: string[] = [];
   const memPath = path.join(workspaceDir, 'MEMORY.md');
   const memoryDir = path.join(workspaceDir, 'memory');
-  
+
   if (fs.existsSync(memPath)) files.push(memPath);
-  
+
   if (fs.existsSync(memoryDir)) {
     const walk = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -1230,26 +1247,45 @@ function findMemoryFiles(workspaceDir: string): string[] {
     };
     walk(memoryDir);
   }
-  
+
   return files;
 }
 
 /** Infer memory type from filename and content */
 function inferType(title: string, _content: string): MemoryUnitType {
   const lower = title.toLowerCase();
-  if (lower.includes('preference') || lower.includes('habit') || lower.includes('prefer')) return 'preference';
-  if (lower.includes('event') || lower.includes('log') || lower.includes('202') || lower.includes('daily')) return 'event';
-  if (lower.includes('decision') || lower.includes('choice') || lower.includes('mistake') || lower.includes('error')) return 'insight';
+  if (lower.includes('preference') || lower.includes('habit') || lower.includes('prefer'))
+    return 'preference';
+  if (
+    lower.includes('event') ||
+    lower.includes('log') ||
+    lower.includes('202') ||
+    lower.includes('daily')
+  )
+    return 'event';
+  if (
+    lower.includes('decision') ||
+    lower.includes('choice') ||
+    lower.includes('mistake') ||
+    lower.includes('error')
+  )
+    return 'insight';
   if (lower.includes('config') || lower.includes('tech') || lower.includes('api')) return 'fact';
   return 'insight';
 }
 
 /** Simple keyword extraction from text */
 function extractKeywords(text: string): string[] {
-  const words = text.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+  const words = text
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((w) => w.length > 3);
   const freq: Record<string, number> = {};
   for (const w of words) freq[w] = (freq[w] || 0) + 1;
-  return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w);
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([w]) => w);
 }
 
 /** Auto-register MemGrid MCP server in OpenClaw Gateway's openclaw.json */

@@ -28,25 +28,61 @@ export function parseMemoryInput(input: string, _sourceFile?: string): ParsedMem
 
   // Detect error/fix: error/fix/bug/OOM/crash keywords
   const errorKeywords = [
-    'error', '错误', 'fix', '修复', 'bug', 'oom', 'crash',
-    '500', '400', 'exception', 'throw', 'return false', 'returned false',
-    "doesn't work", 'not working', '不对', '报错', '失败',
+    'error',
+    '错误',
+    'fix',
+    '修复',
+    'bug',
+    'oom',
+    'crash',
+    '500',
+    '400',
+    'exception',
+    'throw',
+    'return false',
+    'returned false',
+    "doesn't work",
+    'not working',
+    '不对',
+    '报错',
+    '失败',
   ];
   const isError = errorKeywords.some((k) => lower.includes(k));
 
   // Detect decision: chose/picked/decided/selected
   const decisionKeywords = [
-    'chose', 'chosen', 'picked', 'decided', 'selected',
-    '选择', '决定', 'why', '为什么', 'because', '因为',
-    'over', 'instead of', '代替',
+    'chose',
+    'chosen',
+    'picked',
+    'decided',
+    'selected',
+    '选择',
+    '决定',
+    'why',
+    '为什么',
+    'because',
+    '因为',
+    'over',
+    'instead of',
+    '代替',
   ];
   const isDecision = decisionKeywords.some((k) => lower.includes(k));
 
   // Detect style/preference: always/never/prefer/pattern/use
   const styleKeywords = [
-    'always', 'never', 'prefer', 'pattern', 'convention',
-    'use', 'should', '规范', '模式', '应当', '必须',
-    'always use', 'should be',
+    'always',
+    'never',
+    'prefer',
+    'pattern',
+    'convention',
+    'use',
+    'should',
+    '规范',
+    '模式',
+    '应当',
+    '必须',
+    'always use',
+    'should be',
   ];
   const isStyle = styleKeywords.some((k) => lower.includes(k));
 

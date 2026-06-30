@@ -5,9 +5,17 @@ export type MemoryUnitType = 'fact' | 'insight' | 'event' | 'preference';
 
 /** @deprecated Old code-metaphor types (v0.9-). Still accepted but mapped to new types on write. */
 export type LegacyMemoryUnitType =
-  | 'method' | 'component' | 'pattern' | 'config'
-  | 'error_solution' | 'decision' | 'skill_trigger' | 'mcp_trigger'
-  | 'rule_trigger' | 'style_preference' | 'architecture_principle';
+  | 'method'
+  | 'component'
+  | 'pattern'
+  | 'config'
+  | 'error_solution'
+  | 'decision'
+  | 'skill_trigger'
+  | 'mcp_trigger'
+  | 'rule_trigger'
+  | 'style_preference'
+  | 'architecture_principle';
 
 /** Accept both new and legacy types */
 export type AnyMemoryUnitType = MemoryUnitType | LegacyMemoryUnitType;
@@ -63,13 +71,13 @@ export interface Provenance {
 
 export type MemoryTier = 'hot' | 'warm' | 'cold' | 'frozen';
 
-/** 
+/**
  * MemoryUnit — the core memory atom.
- * 
+ *
  * Structure (for indexing)     | Narrative (for understanding)
  * -----------------------------|------------------------------
  * id, type, domain, keywords   | summary, narrative
- * associations                 | 
+ * associations                 |
  * source, code_snippet         |
  */
 export interface MemoryUnit {
@@ -249,7 +257,7 @@ export interface FileScanResult {
 
 // ===== Multi-Domain Types (v0.10+) =====
 
-/** 
+/**
  * Domain type is now free-form.
  * Only "personality" is treated as built-in.
  * All other domains derive meaning from content, not labels.

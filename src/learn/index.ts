@@ -101,7 +101,7 @@ export class LearnEngine {
       for (const tool of task.toolsUsed) {
         // Check if a similar trigger already exists
         const existing = (await this.store.listUnits()).find(
-          (u) => u.type as string === "skill_trigger" && u.summary.includes(tool),
+          (u) => (u.type as string) === 'skill_trigger' && u.summary.includes(tool),
         );
 
         if (!existing) {
