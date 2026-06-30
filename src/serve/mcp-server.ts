@@ -6,20 +6,20 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { MemGrid } from '../memgrid.js';
-import type { MemoryUnitType } from '../shared/types.js';
+import type { MemoryUnitType, LegacyMemoryUnitType, LEGACY_TYPE_MAP } from '../shared/types.js';
 
 const VALID_TYPES: MemoryUnitType[] = [
-  'method',
-  'component',
-  'pattern',
-  'config',
-  'error_solution',
-  'decision',
-  'skill_trigger',
-  'mcp_trigger',
-  'rule_trigger',
-  'style_preference',
-  'architecture_principle',
+  'fact',
+  'insight',
+  'event',
+  'preference',
+];
+
+/** Legacy types that are still accepted but mapped to new types */
+const LEGACY_ACCEPTED: LegacyMemoryUnitType[] = [
+  'method', 'component', 'pattern', 'config',
+  'error_solution', 'decision', 'skill_trigger', 'mcp_trigger',
+  'rule_trigger', 'style_preference', 'architecture_principle',
 ];
 
 export class MemGridServer {
@@ -89,8 +89,8 @@ export class MemGridServer {
               type: {
                 type: 'string',
                 description:
-                  'Unit type: method, pattern, config, error_solution, decision, ' +
-                  'skill_trigger, mcp_trigger, rule_trigger, style_preference, architecture_principle',
+                  'Unit type: fact, insight, event, preference. ' +
+                  'Legacy types (method, pattern, etc.) also accepted and auto-mapped.',
                 enum: VALID_TYPES,
               },
               summary: {
@@ -285,15 +285,16 @@ export class MemGridServer {
               const parsed = parseMemoryInput(summary + ' ' + (description || ''), sourceFile);
               type = parsed.type;
               summary = parsed.summary;
-              description = parsed.content.description || description;
+              description = parsed.narrative || description;
             }
 
-            if (!VALID_TYPES.includes(type)) {
+            const allValidTypes = [...VALID_TYPES, ...LEGACY_ACCEPTED];
+            if (!allValidTypes.includes(type)) {
               return {
                 content: [
                   {
                     type: 'text',
-                    text: 'Invalid type: "' + type + '". Must be one of: ' + VALID_TYPES.join(', '),
+                    text: 'Invalid type: "' + type + '". Must be one of: ' + [...VALID_TYPES, ...LEGACY_ACCEPTED.map(t => t + ' (legacy)')].join(', '),
                   },
                 ],
                 isError: true,
@@ -306,12 +307,10 @@ export class MemGridServer {
               id,
               type: type,
               summary,
-              content: {
-                description,
-                code_snippet: codeSnippet,
-                style_notes: styleNotes,
-              },
+              narrative: description || summary,
+              code_snippet: codeSnippet,
               source: sourceFile ? { file: sourceFile } : undefined,
+              keywords: [],
               associations: (associations || []).map((a: any) => ({
                 to: a.to,
                 relation: a.relation,

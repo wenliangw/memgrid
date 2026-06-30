@@ -10,9 +10,9 @@ describe('RetrieveEngine', () => {
   let store: FileStore;
   let engine: RetrieveEngine;
 
-  const makeUnit = (id: string, summary: string, description: string) => ({
+  const makeUnit = (id: string, summary: string, description: string) => ({narrative: description, keywords: [],
     id,
-    type: 'method' as const,
+    type: 'fact' as const,
     summary,
     signatures: [id],
     content: { description },
@@ -67,8 +67,8 @@ describe('RetrieveEngine', () => {
     const result = await engine.search('create');
     const context = engine.toContext(result);
 
-    expect(context).toContain('MemGrid Context');
-    expect(context).toContain('### u1');
+    expect(context).toContain('Found');
+    expect(context).toContain('u1');
     expect(context).toContain('Creates a new user');
   });
 });

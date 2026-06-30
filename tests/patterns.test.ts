@@ -23,7 +23,7 @@ describe('detectPatterns (Phase 4)', () => {
     return path.relative(tmpDir, filePath);
   }
 
-  it('detects throw new BusinessException as error_solution', () => {
+  it('detects throw new BusinessException as insight', () => {
     const file = writeFile(
       'service.ts',
       `
@@ -34,7 +34,7 @@ try { await userRepo.save(user); } catch (e) { }
 
     const { patterns } = detectPatterns(tmpDir, [file]);
 
-    const errorPatterns = patterns.filter((p) => p.type === 'error_solution');
+    const errorPatterns = patterns.filter((p) => p.type === 'insight');
     expect(errorPatterns.length).toBeGreaterThanOrEqual(1);
     expect(errorPatterns[0].file).toBe(file);
   });

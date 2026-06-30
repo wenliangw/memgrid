@@ -56,7 +56,7 @@ export class ConfigScanner implements Scanner {
         if (keyDeps.length > 0) {
           units.push({
             id: 'config_tech_stack_js',
-            type: 'config',
+            type: 'fact',
             summary: `JS tech stack: ${keyDeps.slice(0, 8).join(', ')}`,
             source: { file: 'package.json' },
             signatures: ['tech stack', 'dependencies', 'npm', 'node', '技术栈'],
@@ -91,7 +91,7 @@ export class ConfigScanner implements Scanner {
 
         units.push({
           id: 'config_tech_stack_python',
-          type: 'config',
+          type: 'fact',
           summary: `Python project${deps.length ? ': ' + deps.slice(0, 5).join(', ') : ''}`,
           source: { file: 'pyproject.toml' },
           signatures: ['tech stack', 'dependencies', 'python', 'pyproject'],
@@ -125,7 +125,7 @@ export class ConfigScanner implements Scanner {
 
       units.push({
         id: 'config_tech_stack_go',
-        type: 'config',
+        type: 'fact',
         summary: `Go module: ${moduleMatch?.[1] || 'unknown'} (go ${goMatch?.[1] || '?'})`,
         source: { file: 'go.mod' },
         signatures: ['tech stack', 'dependencies', 'go', 'golang'],
@@ -157,7 +157,7 @@ export class ConfigScanner implements Scanner {
 
       units.push({
         id: 'config_tech_stack_rust',
-        type: 'config',
+        type: 'fact',
         summary: `Rust crate: ${nameMatch?.[1] || 'unknown'}`,
         source: { file: 'Cargo.toml' },
         signatures: ['tech stack', 'dependencies', 'rust', 'cargo'],
@@ -187,7 +187,7 @@ export class ConfigScanner implements Scanner {
       if (services.length > 0) {
         units.push({
           id: 'config_docker_services',
-          type: 'config',
+          type: 'fact',
           summary: `Docker services: ${services.join(', ')}`,
           source: { file: 'docker-compose.yml' },
           signatures: ['docker', 'infrastructure', 'services', '容器'],

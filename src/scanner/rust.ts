@@ -74,7 +74,7 @@ export class RustScanner implements Scanner {
 
         units.push({
           id: `method_rs_${this.sanitizeId(fullName)}`,
-          type: 'method',
+          type: 'fact',
           summary: retType ? `${fullName}() → ${retType}` : `${fullName}()`,
           source: { file, lines: `${i + 1}` },
           signatures: [fullName, fnName],
@@ -102,7 +102,7 @@ export class RustScanner implements Scanner {
         const structName = match[1];
         units.push({
           id: `method_rs_struct_${this.sanitizeId(structName)}`,
-          type: 'method',
+          type: 'fact',
           summary: `${structName} (struct)`,
           source: { file, lines: `${i + 1}` },
           signatures: [structName],
@@ -125,7 +125,7 @@ export class RustScanner implements Scanner {
       if (match) {
         units.push({
           id: `method_rs_enum_${this.sanitizeId(match[1])}`,
-          type: 'pattern',
+          type: 'insight',
           summary: `${match[1]} (enum)`,
           source: { file, lines: `${i + 1}` },
           signatures: [match[1]],
@@ -148,7 +148,7 @@ export class RustScanner implements Scanner {
       if (match) {
         units.push({
           id: `method_rs_trait_${this.sanitizeId(match[1])}`,
-          type: 'pattern',
+          type: 'insight',
           summary: `${match[1]} (trait)`,
           source: { file, lines: `${i + 1}` },
           signatures: [match[1]],

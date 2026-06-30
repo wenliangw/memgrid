@@ -26,7 +26,7 @@ export function generateLearnings(
     if (pattern.confidence < 0.4) continue;
 
     const now = new Date().toISOString();
-    const isActive = pattern.confidence >= 0.85 && pattern.type !== 'pattern';
+    const isActive = pattern.confidence >= 0.85;
 
     const unit: MemoryUnit = {
       id: `auto_${pattern.type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -34,7 +34,8 @@ export function generateLearnings(
       summary: pattern.summary,
       source: { file: pattern.file },
       signatures: [pattern.summary],
-      content: { description: pattern.summary },
+      narrative: pattern.summary,
+      keywords: [],
       associations: [],
       meta: {
         created: now,
@@ -62,13 +63,12 @@ export function generateLearnings(
       const now = new Date().toISOString();
       const unit: MemoryUnit = {
         id: `auto_error_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        type: 'error_solution',
+        type: 'insight',
         summary: `Architecture violation: ${alert.message.slice(0, 80)}`,
         source: { file: alert.file },
         signatures: [alert.message],
-        content: {
-          description: `Architecture check triggered in ${alert.file}: ${alert.message}`,
-        },
+        narrative: `Architecture check triggered in ${alert.file}: ${alert.message}`,
+      keywords: [],
         associations: [],
         meta: {
           created: now,

@@ -28,7 +28,7 @@ describe('FileStore', () => {
     store.ensureDirs();
     const unit = {
       id: 'test_method_1',
-      type: 'method' as const,
+      type: 'fact' as const,
       summary: 'Test method',
       signatures: ['test.method'],
       content: { description: 'A test method' },
@@ -46,14 +46,14 @@ describe('FileStore', () => {
     const retrieved = store.getUnit('test_method_1');
     expect(retrieved).not.toBeNull();
     expect(retrieved!.id).toBe('test_method_1');
-    expect(retrieved!.type).toBe('method');
+    expect(retrieved!.type).toBe('fact');
   });
 
   it('lists only active units by default', async () => {
     store.ensureDirs();
     store.saveUnit({
       id: 'active_1',
-      type: 'method' as const,
+      type: 'fact' as const,
       summary: 'Active',
       signatures: [],
       content: { description: '' },
@@ -70,7 +70,7 @@ describe('FileStore', () => {
     store.ensureDirs();
     store.saveUnit({
       id: 'to_archive',
-      type: 'pattern' as const,
+      type: 'insight' as const,
       summary: 'To archive',
       signatures: [],
       content: { description: '' },

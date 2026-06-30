@@ -18,6 +18,7 @@ import { startMCPServer } from './mcp-server.js';
 import { injectHooks } from '../hooks.js';
 import { parseMemoryInput, createMemoryUnit } from '../learn/nlp.js';
 import { DomainManager } from '../domain/domain-manager.js';
+import { LibraryManager } from '../library/index.js';
 
 const program = new Command();
 
@@ -355,7 +356,7 @@ program
       console.log(`\n🧠 Patterns detected:`);
       for (const p of result.detectedPatterns) {
         console.log(
-          `  ${p.type === 'error_solution' ? '🐛' : p.type === 'pattern' ? '📐' : '📋'} ${p.summary} (${p.file})`,
+          `  ${p.type === 'insight' ? '💡' : p.type === 'event' ? '📋' : '📋'} ${p.summary} (${p.file})`,
         );
       }
     }
@@ -422,9 +423,8 @@ program
       id,
       type: options.type as any,
       summary: options.summary,
-      content: {
-        description: options.description,
-      },
+      narrative: options.description || options.summary,
+      keywords: [],
       source: options.file ? { file: options.file, lines: options.lines } : undefined,
     });
 
@@ -446,8 +446,7 @@ program
 
     console.log(`🧠 Learned: [${parsed.type}] ${parsed.summary.slice(0, 60)}`);
     console.log(`   id: ${unit.id}`);
-    if (parsed.content.trigger) console.log(`   trigger: ${parsed.content.trigger}`);
-    if (parsed.content.action) console.log(`   action: ${parsed.content.action}`);
+    if (parsed.keywords.length > 0) console.log(`   keywords: ${parsed.keywords.join(', ')}`);
     console.log(`   confidence: ${parsed.confidence}`);
   });
 
@@ -655,7 +654,7 @@ program
           gateway: '🔌',
           custom: '📁',
         };
-        console.log(`  ${icon[d.type] || '📁'} ${d.name}  [${d.type}]`);
+        console.log(`  ${icon[d.type || ''] || '📁'} ${d.name}  [${d.type || 'custom'}]`);
         console.log(`     ${d.path}`);
         console.log(`     ${d.enabled ? '✅ enabled' : '⏸️  disabled'}`);
         if (d.description) console.log(`     ${d.description}`);
@@ -715,6 +714,125 @@ program
     console.error('🚀 MemGrid MCP Server starting...');
     console.error(`   Domain: ${root}`);
     await startMCPServer(root);
+  });
+
+// ===== Library Commands =====
+
+program
+  .command('library-add')
+  .alias('lib-add')
+  .description('Add a document to the knowledge library')
+  .requiredOption('-t, --title <title>', 'Document title')
+  .requiredOption('-d, --domain <domain>', 'Domain name')
+  .option('-f, --file <path>', 'Read content from file')
+  .option('-c, --content <text>', 'Content text')
+  .action(async (options) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    let content: string;
+    if (options.file) {
+      if (!fs.existsSync(options.file)) {
+        console.error(`❌ File not found: ${options.file}`);
+        process.exit(1);
+      }
+      content = fs.readFileSync(options.file, 'utf-8');
+    } else if (options.content) {
+      content = options.content;
+    } else {
+      // Read from stdin
+      content = fs.readFileSync(0, 'utf-8');
+    }
+
+    const doc = lib.add({
+      title: options.title,
+      content,
+      domain: options.domain,
+      source: options.file ? { file: options.file } : undefined,
+    });
+
+    console.log(`📚 Added to library: ${doc.id}`);
+    console.log(`   Title: ${doc.title}`);
+    console.log(`   Size: ${doc.meta.size} chars`);
+    console.log(`   Domain: ${doc.domain}`);
+  });
+
+program
+  .command('library-search')
+  .alias('lib-search')
+  .description('Search the knowledge library')
+  .argument('<query>', 'Search query')
+  .option('-n, --limit <n>', 'Max results', '10')
+  .action(async (query, options) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    const results = lib.search(query, parseInt(options.limit));
+
+    if (results.length === 0) {
+      console.log('No library documents match this query.');
+      return;
+    }
+
+    console.log(`📚 ${results.length} result(s) for "${query}":\n`);
+    for (const doc of results) {
+      console.log(`  [${doc.id}] ${doc.title}`);
+      console.log(`  ${doc.content.slice(0, 150).replace(/\n/g, ' ')}...`);
+      console.log(`  domain: ${doc.domain} | size: ${doc.meta.size}c | used: ${doc.meta.usage_count}×\n`);
+    }
+  });
+
+program
+  .command('library-list')
+  .alias('lib-list')
+  .description('List all documents in the knowledge library')
+  .action(async () => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+    const { total, totalSize } = lib.stats;
+
+    const docs = lib.list();
+    console.log(`📚 ${docs.length} document(s) | ${(totalSize / 1024).toFixed(1)} KB total\n`);
+    for (const doc of docs) {
+      console.log(`  [${doc.id}] ${doc.title}`);
+      console.log(`  domain: ${doc.domain} | ${doc.meta.size}c | ${doc.meta.usage_count}× read\n`);
+    }
+  });
+
+program
+  .command('library-get')
+  .alias('lib-get')
+  .description('Get full content of a library document')
+  .argument('<id>', 'Document ID')
+  .action(async (id) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    const doc = lib.get(id);
+    if (!doc) {
+      console.log(`❌ Document not found: ${id}`);
+      return;
+    }
+
+    console.log(`📚 ${doc.title} [${doc.id}]`);
+    console.log(`domain: ${doc.domain} | size: ${doc.meta.size}c\n`);
+    console.log(doc.content);
+  });
+
+program
+  .command('library-remove')
+  .alias('lib-rm')
+  .description('Remove a document from the knowledge library')
+  .argument('<id>', 'Document ID')
+  .action(async (id) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+
+    if (lib.remove(id)) {
+      console.log(`🗑️  Removed: ${id}`);
+    } else {
+      console.log(`❌ Document not found: ${id}`);
+    }
   });
 
 program.parse();

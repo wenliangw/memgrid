@@ -56,13 +56,10 @@ export class LearnEngine {
         // Don't actually scan here — just flag for memgrid init
         for (const file of newFiles) {
           suggestions.add.push({
-            type: 'method',
+            type: 'fact',
             summary: `[TODO] New file: ${file}`,
-            content: {
-              description: `This file was created/modified in task: "${task.summary}". Run \`memgrid init\` to scan for method units.`,
-              trigger: `When working near ${file}`,
-              action: `Rescan with memgrid init`,
-            },
+            narrative: `This file was created/modified in task: "${task.summary}". Run \`memgrid init\` to scan for method units.`,
+            keywords: ['rescan', 'new-file'],
             source: { file },
           });
         }
@@ -74,11 +71,10 @@ export class LearnEngine {
       for (const error of task.errorsEncountered) {
         const _id = `error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         suggestions.add.push({
-          type: 'error_solution',
+          type: 'insight',
           summary: `Error fix: ${error.slice(0, 80)}`,
-          content: {
-            description: error,
-          },
+          narrative: error,
+          keywords: ['error', 'fix'],
         });
       }
       summaries.push(
@@ -91,11 +87,10 @@ export class LearnEngine {
       for (const decision of task.decisions) {
         const _id = `decision_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         suggestions.add.push({
-          type: 'decision',
+          type: 'insight',
           summary: decision.slice(0, 80),
-          content: {
-            description: `Design decision from task "${task.summary}": ${decision}`,
-          },
+          narrative: `Design decision from task "${task.summary}": ${decision}`,
+          keywords: ['decision', 'design'],
         });
       }
       summaries.push(`🎯 ${task.decisions.length} decision(s) recorded`);
@@ -106,19 +101,16 @@ export class LearnEngine {
       for (const tool of task.toolsUsed) {
         // Check if a similar trigger already exists
         const existing = (await this.store.listUnits()).find(
-          (u) => u.type === 'skill_trigger' && u.summary.includes(tool),
+          (u) => u.type as string === "skill_trigger" && u.summary.includes(tool),
         );
 
         if (!existing) {
           const _id = `trigger_skill_${tool.replace(/[^a-z0-9_]/g, '_')}_${Date.now()}`;
           suggestions.add.push({
-            type: 'skill_trigger',
+            type: 'event',
             summary: `When working on ${this.inferDomain(task.summary)} → use ${tool}`,
-            content: {
-              description: `Task "${task.summary}" successfully used ${tool}`,
-              trigger: this.inferDomain(task.summary),
-              action: `Enable and use ${tool}`,
-            },
+            narrative: `Task "${task.summary}" successfully used ${tool}. Usage context: ${this.inferDomain(task.summary)}`,
+            keywords: [tool.toLowerCase(), 'tool'],
           });
         }
       }
@@ -130,12 +122,10 @@ export class LearnEngine {
       for (const style of task.styleObservations) {
         const _id = `style_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         suggestions.add.push({
-          type: 'style_preference',
+          type: 'preference',
           summary: style.slice(0, 80),
-          content: {
-            description: `Observed in task "${task.summary}": ${style}`,
-            style_notes: style,
-          },
+          narrative: `Observed in task "${task.summary}": ${style}`,
+          keywords: ['style', 'preference'],
         });
       }
       summaries.push(`🎨 ${task.styleObservations.length} style preference(s) recorded`);
@@ -143,7 +133,7 @@ export class LearnEngine {
 
     // 6. Check for units that might need archiving (stale — referenced files deleted)
     const allUnits = await this.store.listUnits();
-    for (const unit of allUnits.filter((u) => u.type === 'method')) {
+    for (const unit of allUnits.filter((u) => u.type === 'fact')) {
       if (unit.source?.file && task.filesModified.includes(unit.source.file)) {
         // File was modified — flag for review
         suggestions.update.push({
@@ -190,7 +180,8 @@ export class LearnEngine {
         type: unit.type as MemoryUnitType,
         summary: unit.summary || 'Unknown',
         signatures: unit.signatures || [],
-        content: unit.content || { description: '' },
+        narrative: unit.narrative || '',
+        keywords: unit.keywords || [],
         source: unit.source,
         associations: [],
         meta: {

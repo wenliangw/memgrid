@@ -14,12 +14,12 @@ describe('SemanticRetriever', () => {
   let store: FileStore;
   let retriever: SemanticRetriever;
 
-  const makeUnit = (id: string, summary: string, description: string) => ({
+  const makeUnit = (id: string, summary: string, description: string) => ({summary, narrative: description, keywords: [],
     id,
-    type: 'method' as const,
+    type: 'fact' as const,
     summary,
     signatures: [id],
-    content: { description },
+    narrative: description, keywords: [],
     associations: [],
     meta: {
       created: new Date().toISOString(),
@@ -83,7 +83,7 @@ describe('SemanticRetriever', () => {
 
     const result = await retriever.search('auth');
     const ctx = retriever.toContext(result);
-    expect(ctx).toContain('MemGrid Context');
+    expect(ctx).toContain('Found');
     expect(ctx).toContain('u1');
   });
 

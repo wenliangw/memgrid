@@ -28,7 +28,7 @@ export function detectPatterns(
         const match = code.match(/catch\s*\(([^)]*)\)\s*\{([^}]*)\}/);
         if (match) {
           patterns.push({
-            type: 'error_solution',
+            type: 'insight',
             summary: `Error handling pattern in ${path.basename(file)}`,
             file,
             confidence: 0.4,
@@ -41,7 +41,7 @@ export function detectPatterns(
       let bMatch;
       while ((bMatch = businessExRe.exec(code)) !== null) {
         patterns.push({
-          type: 'error_solution',
+          type: 'insight',
           summary: `${bMatch[1]} thrown in ${path.basename(file)}`,
           file,
           confidence: 0.5,
@@ -51,7 +51,7 @@ export function detectPatterns(
       // Detect @Injectable/@Module/@Controller → NestJS pattern
       if (code.includes('@Injectable()')) {
         patterns.push({
-          type: 'pattern',
+          type: 'insight',
           summary: `Injectable service in ${path.basename(file)}`,
           file,
           confidence: 0.6,
@@ -60,7 +60,7 @@ export function detectPatterns(
 
       if (code.includes('@Module(')) {
         patterns.push({
-          type: 'pattern',
+          type: 'insight',
           summary: `NestJS Module: ${path.basename(file)}`,
           file,
           confidence: 0.7,
@@ -70,7 +70,7 @@ export function detectPatterns(
       // Detect Builder pattern
       if (code.includes('extends') && code.includes('builder') && code.includes('return this')) {
         patterns.push({
-          type: 'pattern',
+          type: 'insight',
           summary: `Builder pattern in ${path.basename(file)}`,
           file,
           confidence: 0.5,
@@ -80,7 +80,7 @@ export function detectPatterns(
       // Detect new imports of infrastructure patterns
       if (code.includes("from '@nestjs/common'") && code.includes('forwardRef')) {
         patterns.push({
-          type: 'decision',
+          type: 'insight',
           summary: `forwardRef() used in ${path.basename(file)} — may indicate circular dependency`,
           file,
           confidence: 0.3,
@@ -90,7 +90,7 @@ export function detectPatterns(
       // Detect strategy/template method pattern via abstract classes
       if (code.includes('abstract class') && code.includes('extends')) {
         patterns.push({
-          type: 'pattern',
+          type: 'insight',
           summary: `Strategy/Template pattern in ${path.basename(file)}`,
           file,
           confidence: 0.4,

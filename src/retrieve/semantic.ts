@@ -77,7 +77,7 @@ export class SemanticRetriever {
     for (let i = 0; i < units.length; i += batchSize) {
       const batch = units.slice(i, i + batchSize);
       const texts = batch.map((u) =>
-        `${u.summary}. ${u.content.description}. ${u.signatures.join(' ')}`.slice(0, 500),
+        `${u.summary}. ${u.narrative}. ${u.signatures.join(' ')}`.slice(0, 500),
       );
 
       try {
@@ -108,7 +108,7 @@ export class SemanticRetriever {
     if (cached) return { ...cached, elapsedMs: 0 };
 
     // Step 1: Keyword search (always works)
-    const keywordResult = await this.baseEngine.search(query, maxResults * 2, maxHops);
+    const keywordResult = await this.baseEngine.search(query, { maxResults: maxResults * 2, maxHops });
     const keywordScores = new Map<string, number>();
     const allKeywordUnits = new Map<string, MemoryUnit>();
 

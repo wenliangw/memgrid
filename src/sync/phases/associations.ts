@@ -36,7 +36,7 @@ export function analyzeAssociations(
 
       const fileUnits = unitByFile.get(file) || [];
       for (const unit of fileUnits) {
-        if (unit.type !== 'method') continue;
+        if (unit.type !== 'fact') continue;
 
         // Clear old associations (after task, rebuild fresh)
         const oldCount = unit.associations.length;
@@ -46,7 +46,7 @@ export function analyzeAssociations(
         for (const [importName, sourceFile] of importMap) {
           if (
             !unit.signatures.some((s) => s.includes(importName)) &&
-            !unit.content.dependencies?.includes(importName)
+            !unit.keywords?.includes(importName.toLowerCase())
           )
             continue;
           const targetUnitId = findUnitByFile(units, sourceFile, importName);

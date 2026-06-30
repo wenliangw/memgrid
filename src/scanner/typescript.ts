@@ -121,7 +121,7 @@ export class TypeScriptScanner implements Scanner {
               .replace(/\./g, '_')
               .replace(/[^a-z0-9_]/g, '_')
               .replace(/_+/g, '_')}`,
-            type: 'method',
+            type: 'fact',
             summary: `${signature} — ${this.extractJsDoc(method)}`,
             source: {
               file: filePath,
@@ -167,7 +167,7 @@ export class TypeScriptScanner implements Scanner {
 
         const unit: MemoryUnit = {
           id: `method_${this.sanitizeId(funcName)}`,
-          type: 'method',
+          type: 'fact',
           summary: `${funcName}() — ${this.extractJsDoc(func)}`,
           source: {
             file: filePath,
@@ -213,7 +213,7 @@ export class TypeScriptScanner implements Scanner {
 
         const unit: MemoryUnit = {
           id: `example_${isBad ? 'bad' : 'good'}_${file.replace('.ts', '')}`,
-          type: isBad ? 'error_solution' : 'pattern',
+          type: 'insight',
           summary: `${isBad ? '❌ Bad' : '✅ Good'} example: ${file.replace('.ts', '').replace(/-/g, ' ')}`,
           source: { file: relativePath },
           signatures: [file.replace('.ts', '').replace(/-/g, ' ')],
@@ -270,7 +270,7 @@ export class TypeScriptScanner implements Scanner {
       if (keyDeps.length > 0) {
         units.push({
           id: 'config_tech_stack',
-          type: 'config',
+          type: 'fact',
           summary: `Tech stack: ${keyDeps.slice(0, 8).join(', ')}`,
           source: { file: 'package.json' },
           signatures: ['tech stack', 'dependencies', '技术栈'],
@@ -296,7 +296,7 @@ export class TypeScriptScanner implements Scanner {
 
       units.push({
         id: 'config_docker_services',
-        type: 'config',
+        type: 'fact',
         summary: `Docker services: ${services.join(', ')}`,
         source: { file: 'docker-compose.yml' },
         signatures: ['docker', 'services', 'containers'],
@@ -323,9 +323,9 @@ export class TypeScriptScanner implements Scanner {
   }
 
   private buildAssociations(units: MemoryUnit[]): void {
-    const methodUnits = units.filter((u) => u.type === 'method');
-    const patternUnits = units.filter((u) => u.type === 'pattern');
-    const configUnits = units.filter((u) => u.type === 'config');
+    const methodUnits = units.filter((u) => u.type === 'fact');
+    const patternUnits = units.filter((u) => u.type === 'insight');
+    const configUnits = units.filter((u) => u.type === 'fact');
 
     // Build a signature → unit index for fast lookup
     const sigIndex = new Map<string, string>(); // signature → unit id
@@ -339,7 +339,7 @@ export class TypeScriptScanner implements Scanner {
       if (!unit.source?.file) continue;
 
       // 1. Extract called names from code_snippet
-      const snippet = unit.content.code_snippet || '';
+      const snippet = unit.code_snippet || '';
       const calledNames = this.extractCalledNames(snippet);
 
       for (const name of calledNames) {
@@ -397,7 +397,7 @@ export class TypeScriptScanner implements Scanner {
     for (const config of configUnits) {
       const configKeywords = config.signatures;
       for (const method of methodUnits) {
-        const snippet = (method.content.code_snippet || '') + (method.content.description || '');
+        const snippet = (method.code_snippet || '') + (method.narrative || '');
         if (
           configKeywords.some(
             (k) => snippet.toLowerCase().includes(k.toLowerCase()) && k.length > 3,
