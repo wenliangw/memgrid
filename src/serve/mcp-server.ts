@@ -116,6 +116,13 @@ export class MemGridServer {
                 type: 'string',
                 description: 'Style or usage notes',
               },
+              domain: {
+                type: 'string',
+                description:
+                  'Target domain. Use "personality" for cross-project preferences, ' +
+                  'project name (e.g. "septonir") for project-specific memories, ' +
+                  'or omit for current session domain.',
+              },
               status: {
                 type: 'string',
                 description:
@@ -247,6 +254,67 @@ export class MemGridServer {
           },
         },
         {
+          name: 'memgrid_update',
+          description:
+            'Update an existing memory unit. Only provided fields will be changed. ' +
+            'Can change type, summary, narrative, keywords, domain, or confidence.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              unitId: {
+                type: 'string',
+                description: 'ID of the unit to update',
+              },
+              type: {
+                type: 'string',
+                description: 'New unit type (fact/insight/event/preference)',
+                enum: VALID_TYPES,
+              },
+              summary: {
+                type: 'string',
+                description: 'New one-line summary',
+              },
+              description: {
+                type: 'string',
+                description: 'New detailed description (narrative)',
+              },
+              domain: {
+                type: 'string',
+                description: 'New domain to move the unit to',
+              },
+              keywords: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'New keywords',
+              },
+              confidence: {
+                type: 'number',
+                description: 'New confidence score (0.0-1.0)',
+              },
+              status: {
+                type: 'string',
+                enum: ['active', 'stale', 'archived', 'candidate'],
+                description: 'New status',
+              },
+            },
+            required: ['unitId'],
+          },
+        },
+        {
+          name: 'memgrid_archive',
+          description: 'Archive a memory unit (mark as inactive, excluded from search results).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              unitId: {
+                type: 'string',
+                description: 'ID of the unit to archive',
+              },
+            },
+            required: ['unitId'],
+          },
+        },
+        {
           name: 'memgrid_extract',
           description:
             'Extract memory candidates from conversation text. ' +
@@ -307,7 +375,8 @@ export class MemGridServer {
 
           case 'memgrid_add': {
             let { summary, description } = args as any;
-            const { sourceFile, codeSnippet, _styleNotes, associations, status } = args as any;
+            const { sourceFile, codeSnippet, _styleNotes, associations, status, domain } =
+              args as any;
             let { type } = args as any;
 
             // NLP auto-detect: if no type provided, parse from description
@@ -341,6 +410,7 @@ export class MemGridServer {
             const unit = await this.mg.add({
               id,
               type: type,
+              domain: domain || undefined,
               summary,
               narrative: description || summary,
               code_snippet: codeSnippet,
@@ -631,6 +701,45 @@ export class MemGridServer {
             return {
               content: [{ type: 'text', text: `❌ Unit not found or not frozen: ${unitId}` }],
               isError: true,
+            };
+          }
+
+          case 'memgrid_update': {
+            const { unitId, type, summary, description, domain, keywords, confidence, status } =
+              args as any;
+            const patch: any = {};
+            if (type) patch.type = type;
+            if (summary) patch.summary = summary;
+            if (description) patch.narrative = description;
+            if (domain) patch.domain = domain;
+            if (keywords) patch.keywords = keywords;
+            if (confidence !== undefined) patch.meta = { confidence };
+            if (status) patch.meta = { ...patch.meta, status };
+
+            const unit = await this.mg.update(unitId, patch);
+            if (unit) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `✏️ Updated: [${unit.id}] ${unit.summary.slice(0, 80)}`,
+                  },
+                ],
+              };
+            }
+            return {
+              content: [{ type: 'text', text: `❌ Unit not found: ${unitId}` }],
+              isError: true,
+            };
+          }
+
+          case 'memgrid_archive': {
+            const { unitId } = args as any;
+            await this.mg.archive(unitId);
+            return {
+              content: [
+                { type: 'text', text: `🗄️  Archived: ${unitId}\n   Excluded from search results.` },
+              ],
             };
           }
 
