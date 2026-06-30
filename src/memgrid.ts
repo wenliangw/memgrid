@@ -200,7 +200,8 @@ export class MemGrid {
   ): Promise<MemoryUnit> {
     // Auto-upgrade legacy types to new cognitive types
     const legacyType = unit.type as string;
-    const normalizedType: MemoryUnitType = LEGACY_TYPE_MAP[legacyType as LegacyMemoryUnitType] ?? (unit.type as MemoryUnitType);
+    const normalizedType: MemoryUnitType =
+      LEGACY_TYPE_MAP[legacyType as LegacyMemoryUnitType] ?? (unit.type as MemoryUnitType);
 
     const fullUnit: MemoryUnit = {
       ...unit,
@@ -252,10 +253,7 @@ export class MemGrid {
     const conflicts: ConflictResult[] = [];
 
     // Group by type — only some types can meaningfully conflict
-    const conflictTypes: MemoryUnitType[] = [
-      'preference',
-      'insight',
-    ];
+    const conflictTypes: MemoryUnitType[] = ['preference', 'insight'];
 
     for (const cType of conflictTypes) {
       const group = units.filter(
@@ -513,7 +511,9 @@ export class MemGrid {
     const hasAssociations = unit.associations.length > 0 ? 0.5 : 0;
     const richnessFactor = Math.min(1, (unit.narrative?.length || 0) / 500);
 
-    return confidenceFactor * 0.35 + usageFactor * 0.25 + hasAssociations * 0.25 + richnessFactor * 0.15;
+    return (
+      confidenceFactor * 0.35 + usageFactor * 0.25 + hasAssociations * 0.25 + richnessFactor * 0.15
+    );
   }
 
   context(result: SearchResult): string {

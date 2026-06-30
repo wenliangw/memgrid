@@ -10,7 +10,9 @@ describe('RetrieveEngine', () => {
   let store: FileStore;
   let engine: RetrieveEngine;
 
-  const makeUnit = (id: string, summary: string, description: string) => ({narrative: description, keywords: [],
+  const makeUnit = (id: string, summary: string, description: string) => ({
+    narrative: description,
+    keywords: [],
     id,
     type: 'fact' as const,
     summary,

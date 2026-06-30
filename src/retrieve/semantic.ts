@@ -108,7 +108,10 @@ export class SemanticRetriever {
     if (cached) return { ...cached, elapsedMs: 0 };
 
     // Step 1: Keyword search (always works)
-    const keywordResult = await this.baseEngine.search(query, { maxResults: maxResults * 2, maxHops });
+    const keywordResult = await this.baseEngine.search(query, {
+      maxResults: maxResults * 2,
+      maxHops,
+    });
     const keywordScores = new Map<string, number>();
     const allKeywordUnits = new Map<string, MemoryUnit>();
 

@@ -73,7 +73,8 @@ describe('LearnEngine', () => {
       type: 'fact',
       summary: 'Old create method',
       signatures: ['OldClass.create'],
-      narrative: 'Old implementation', keywords: [],
+      narrative: 'Old implementation',
+      keywords: [],
       source: { file: 'src/old-service.ts' },
       associations: [],
       meta: {

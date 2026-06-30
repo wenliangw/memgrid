@@ -68,7 +68,7 @@ export function generateLearnings(
         source: { file: alert.file },
         signatures: [alert.message],
         narrative: `Architecture check triggered in ${alert.file}: ${alert.message}`,
-      keywords: [],
+        keywords: [],
         associations: [],
         meta: {
           created: now,

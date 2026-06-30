@@ -8,18 +8,21 @@ import {
 import { MemGrid } from '../memgrid.js';
 import type { MemoryUnitType, LegacyMemoryUnitType } from '../shared/types.js';
 
-const VALID_TYPES: MemoryUnitType[] = [
-  'fact',
-  'insight',
-  'event',
-  'preference',
-];
+const VALID_TYPES: MemoryUnitType[] = ['fact', 'insight', 'event', 'preference'];
 
 /** Legacy types that are still accepted but mapped to new types */
 const LEGACY_ACCEPTED: LegacyMemoryUnitType[] = [
-  'method', 'component', 'pattern', 'config',
-  'error_solution', 'decision', 'skill_trigger', 'mcp_trigger',
-  'rule_trigger', 'style_preference', 'architecture_principle',
+  'method',
+  'component',
+  'pattern',
+  'config',
+  'error_solution',
+  'decision',
+  'skill_trigger',
+  'mcp_trigger',
+  'rule_trigger',
+  'style_preference',
+  'architecture_principle',
 ];
 
 export class MemGridServer {
@@ -294,7 +297,11 @@ export class MemGridServer {
                 content: [
                   {
                     type: 'text',
-                    text: 'Invalid type: "' + type + '". Must be one of: ' + [...VALID_TYPES, ...LEGACY_ACCEPTED.map(t => t + ' (legacy)')].join(', '),
+                    text:
+                      'Invalid type: "' +
+                      type +
+                      '". Must be one of: ' +
+                      [...VALID_TYPES, ...LEGACY_ACCEPTED.map((t) => t + ' (legacy)')].join(', '),
                   },
                 ],
                 isError: true,

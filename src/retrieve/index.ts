@@ -44,12 +44,7 @@ export class RetrieveEngine {
     if (this.index && this.indexBuilt) return;
 
     this.index = new MiniSearch({
-      fields: [
-        'summary',
-        'signatures',
-        'keywords',
-        'narrative',
-      ],
+      fields: ['summary', 'signatures', 'keywords', 'narrative'],
       storeFields: ['id'],
       searchOptions: {
         boost: { summary: 5, keywords: 4, narrative: 3, signatures: 3 },
@@ -196,7 +191,9 @@ export class RetrieveEngine {
     if (result.units.length === 0) {
       return `No matching memories found for "${result.query}".`;
     }
-    const lines = [`Found ${result.units.length} memories for "${result.query}" (${result.elapsedMs}ms):`];
+    const lines = [
+      `Found ${result.units.length} memories for "${result.query}" (${result.elapsedMs}ms):`,
+    ];
     for (const u of result.units) {
       lines.push(`\n--- ${u.id} ---`);
       lines.push(this.context(u));

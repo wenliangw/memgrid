@@ -1,6 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { MemoryUnit, MemoryGrid, MemoryUnitType, LegacyMemoryUnitType } from '../shared/types.js';
+import type {
+  MemoryUnit,
+  MemoryGrid,
+  MemoryUnitType,
+  LegacyMemoryUnitType,
+} from '../shared/types.js';
 import { LEGACY_TYPE_MAP } from '../shared/types.js';
 
 const GRID_DIR = '.memgrid';

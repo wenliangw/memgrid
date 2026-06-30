@@ -37,7 +37,8 @@ export class LibraryManager {
   }): LibraryUnit {
     this.ensureDirs();
 
-    const id = doc.id || `lib_${crypto.createHash('md5').update(doc.title).digest('hex').slice(0, 8)}`;
+    const id =
+      doc.id || `lib_${crypto.createHash('md5').update(doc.title).digest('hex').slice(0, 8)}`;
     const filePath = path.join(this.libraryDir, `${id}.json`);
 
     // If already exists, update
@@ -45,7 +46,9 @@ export class LibraryManager {
     if (fs.existsSync(filePath)) {
       try {
         existing = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      } catch { /* overwrite */ }
+      } catch {
+        /* overwrite */
+      }
     }
 
     const unit: LibraryUnit = {
@@ -209,12 +212,64 @@ function extractKeywords(text: string): string[] {
 }
 
 const STOP_WORDS = new Set([
-  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'have',
-  'not', 'are', 'but', 'was', 'has', 'been', 'can', 'all',
-  'will', 'would', 'should', 'about', 'when', 'where',
-  'which', 'what', 'their', 'they', 'there', 'here',
-  '的', '了', '是', '在', '我', '不', '有', '人',
-  '这', '就', '都', '也', '个', '和', '你', '他',
-  '那', '要', '会', '着', '没', '到', '说', '去',
-  '大', '小', '上', '下', '中', '来', '能', '好',
+  'the',
+  'and',
+  'for',
+  'with',
+  'that',
+  'this',
+  'from',
+  'have',
+  'not',
+  'are',
+  'but',
+  'was',
+  'has',
+  'been',
+  'can',
+  'all',
+  'will',
+  'would',
+  'should',
+  'about',
+  'when',
+  'where',
+  'which',
+  'what',
+  'their',
+  'they',
+  'there',
+  'here',
+  '的',
+  '了',
+  '是',
+  '在',
+  '我',
+  '不',
+  '有',
+  '人',
+  '这',
+  '就',
+  '都',
+  '也',
+  '个',
+  '和',
+  '你',
+  '他',
+  '那',
+  '要',
+  '会',
+  '着',
+  '没',
+  '到',
+  '说',
+  '去',
+  '大',
+  '小',
+  '上',
+  '下',
+  '中',
+  '来',
+  '能',
+  '好',
 ]);
