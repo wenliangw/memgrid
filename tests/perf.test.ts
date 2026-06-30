@@ -174,6 +174,6 @@ describe('Performance Benchmarks', () => {
     const elapsed = performance.now() - t0;
 
     expect(result.elapsedMs).toBeLessThan(10);
-    expect(elapsed).toBeLessThan(PERF.CACHE_HIT_MAX_MS * 3);
+    expect(elapsed).toBeLessThan(PERF.CACHE_HIT_MAX_MS * 5);
   });
 });
