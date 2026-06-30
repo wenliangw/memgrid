@@ -26,7 +26,7 @@ const program = new Command();
 program
   .name('memgrid')
   .description('Project-level semantic memory for AI coding agents')
-  .version('0.10.0');
+  .version(readPackageVersion());
 
 program
   .command('init')
@@ -1395,6 +1395,25 @@ function extractKeywords(text: string): string[] {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([w]) => w);
+}
+
+/** Read version from package.json — never hardcoded */
+function readPackageVersion(): string {
+  const candidates = [
+    path.join(path.dirname(process.argv[1] || ''), '..', 'package.json'),
+    path.join(process.cwd(), 'package.json'),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const v = JSON.parse(fs.readFileSync(p, 'utf-8')).version;
+        if (v) return v;
+      }
+    } catch {
+      /* try next */
+    }
+  }
+  return '0.10.0'; // fallback
 }
 
 /** Auto-register MemGrid MCP server in OpenClaw Gateway's openclaw.json */
