@@ -640,7 +640,9 @@ export class MemGridServer {
 
             if (raw.length === 0) {
               return {
-                content: [{ type: 'text', text: 'No memory candidates extracted from conversation.' }],
+                content: [
+                  { type: 'text', text: 'No memory candidates extracted from conversation.' },
+                ],
               };
             }
 
@@ -655,7 +657,9 @@ export class MemGridServer {
               // Check for near-duplicates before saving
               const existing = this.mg.store.listUnitsSync({ includeCandidate: true }) || [];
               const isDuplicate = existing.some(
-                (u) => u.summary.slice(0, 40).toLowerCase() === candidate.summary.slice(0, 40).toLowerCase(),
+                (u) =>
+                  u.summary.slice(0, 40).toLowerCase() ===
+                  candidate.summary.slice(0, 40).toLowerCase(),
               );
               if (!isDuplicate) {
                 this.mg.store.saveUnit(unit);

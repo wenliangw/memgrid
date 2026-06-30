@@ -103,10 +103,7 @@ export class ExtractEngine {
     if (candidates.length === 0) return null;
 
     const items = candidates
-      .map(
-        (c, i) =>
-          `${i + 1}. [${c.type}] ${c.summary}\n   Text: ${c.sourceText}`,
-      )
+      .map((c, i) => `${i + 1}. [${c.type}] ${c.summary}\n   Text: ${c.sourceText}`)
       .join('\n');
 
     return `Extract memory units from the following conversation. For each item, refine the type (fact/insight/event/preference), summary, and keywords. Return JSON array:
@@ -229,11 +226,56 @@ function deduplicate(candidates: ExtractCandidate[]): ExtractCandidate[] {
 }
 
 const STOP_WORDS = new Set([
-  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'have',
-  'not', 'are', 'but', 'was', 'has', 'been', 'can', 'all',
-  'will', 'would', 'should', 'about', 'when', 'where',
-  'which', 'what', 'their', 'they', 'there', 'here',
-  '的', '了', '是', '在', '我', '不', '有', '人',
-  '这', '就', '都', '也', '个', '和', '你', '他',
-  '那', '要', '会', '着', '没', '到', '说', '去',
+  'the',
+  'and',
+  'for',
+  'with',
+  'that',
+  'this',
+  'from',
+  'have',
+  'not',
+  'are',
+  'but',
+  'was',
+  'has',
+  'been',
+  'can',
+  'all',
+  'will',
+  'would',
+  'should',
+  'about',
+  'when',
+  'where',
+  'which',
+  'what',
+  'their',
+  'they',
+  'there',
+  'here',
+  '的',
+  '了',
+  '是',
+  '在',
+  '我',
+  '不',
+  '有',
+  '人',
+  '这',
+  '就',
+  '都',
+  '也',
+  '个',
+  '和',
+  '你',
+  '他',
+  '那',
+  '要',
+  '会',
+  '着',
+  '没',
+  '到',
+  '说',
+  '去',
 ]);

@@ -35,7 +35,6 @@ import { SyncEngine } from './sync/index.js';
 import { LibraryManager } from './library/index.js';
 import { ExtractEngine } from './extract/index.js';
 
-
 export class MemGrid {
   store: FileStore;
   scanner: Scanner;
