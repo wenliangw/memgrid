@@ -843,6 +843,115 @@ program
     }
   });
 
+program
+  .command('migrate')
+  .description(
+    'Migrate existing memories into MemGrid: long content → library, update memory units with library_ref',
+  )
+  .option('-d, --domain <name>', 'Target domain (default: current session domain)')
+  .option('--source <path>', 'Source directory to scan for .md files')
+  .option('--dry-run', 'Show what would be migrated without writing changes')
+  .action(async (options) => {
+    const gridDir = path.join(process.cwd(), '.memgrid');
+    const lib = new LibraryManager(gridDir);
+    const mg = new MemGrid(process.cwd());
+
+    // Determine source: default to current working directory's memory/ folder
+    const sourceDir = options.source || path.join(process.cwd(), 'memory');
+    if (!fs.existsSync(sourceDir)) {
+      console.log(`❌ Source directory not found: ${sourceDir}`);
+      return;
+    }
+
+    // Find all .md files
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.md')) files.push(full);
+      }
+    };
+    walk(sourceDir);
+
+    let migrated = 0;
+    let updated = 0;
+    const domain = options.domain || 'default';
+
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf-8');
+      if (content.trim().length === 0) continue;
+
+      const title = path.basename(file, '.md');
+
+      if (content.length > 500) {
+        // Long content → library
+        const libId = `lib_migrated_${title.replace(/[^a-z0-9_]/g, '_').slice(0, 40)}`;
+
+        if (!options.dryRun) {
+          lib.add({
+            id: libId,
+            title,
+            content,
+            domain,
+            source: { file },
+          });
+
+          // Update existing memory units that reference this file
+          const allUnits = mg.store.listUnitsSync({ includeCandidate: true }) || [];
+          for (const unit of allUnits) {
+            if (unit.source?.file?.includes(title) || unit.summary?.includes(title)) {
+              unit.library_ref = libId;
+              mg.store.saveUnit(unit);
+              updated++;
+            }
+          }
+        }
+
+        migrated++;
+        console.log(`  📚 → library: ${title} (${content.length}c)`);
+      }
+    }
+
+    if (options.dryRun) {
+      console.log(`\n🔍 Dry run: ${migrated} file(s) would be migrated to library`);
+    } else {
+      console.log(
+        `\n✅ Migrated ${migrated} document(s) to library, ${updated} memory unit(s) updated with library_ref`,
+      );
+    }
+  });
+
+program
+  .command('extract')
+  .description('Extract memory candidates from text (stdin or --text)')
+  .option('-t, --text <text>', 'Text to extract from')
+  .option('-d, --domain <name>', 'Domain to assign', 'conversation')
+  .option('--save', 'Save candidates as memory units')
+  .action(async (options) => {
+    const text = options.text || fs.readFileSync(0, 'utf-8');
+    const mg = new MemGrid(process.cwd());
+    const { raw } = mg.extract.extract(text);
+
+    console.log(`🧠 Extracted ${raw.length} candidate(s):\n`);
+    for (const c of raw) {
+      console.log(`  [${c.type}] ${c.summary}`);
+      console.log(`  confidence: ${c.confidence.toFixed(2)}`);
+      console.log(`  keywords: ${c.keywords.join(', ')}`);
+      console.log();
+    }
+
+    if (options.save && raw.length > 0) {
+      let saved = 0;
+      for (const c of raw) {
+        const unit = mg.extract.toMemoryUnit(c, options.domain);
+        mg.store.saveUnit(unit);
+        saved++;
+      }
+      console.log(`✅ Saved ${saved} candidate unit(s). Review with: memgrid review`);
+    }
+  });
+
 program.parse();
 
 // ===== Helper Functions =====
@@ -1337,22 +1446,40 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
     '',
     '<!-- MEMGRID:START -->',
     '',
-    '## 🧠 MemGrid — Project Memory System',
+    '## 🧠 MemGrid — Memory System',
     '',
-    'This agent has access to MemGrid memory tools. Before starting any task, search the memory grid for relevant context.',
+    'This agent has access to MemGrid memory tools.',
     '',
-    'Use the MCP tool `memgrid_search` to search the memory grid.',
-    'Use `memgrid_review` to confirm or reject candidate (auto-learned) memories.',
-    'Use `memgrid_add` to record new learnings after completing a task.',
+    '### Search (before every task)',
+    '```',
+    'memgrid_search(query="your task description", maxResults=10)',
+    '```',
+    '',
+    '### Remember (after every turn)',
+    '',
+    'After each conversation turn, extract and store what matters:',
+    '',
+    '1. **Review**: What was discussed? Any decisions, discoveries, or preferences?',
+    '2. **Pre-filter**: Call `memgrid_extract` for rule-based candidate detection',
+    '3. **Refine** (you do this — you have full context):',
+    '   - Remove noise (greetings, small talk, brief confirmations)',
+    '   - Fix type if the rule engine misclassified',
+    '   - Merge related candidates into one',
+    '   - Enrich narrative with causality and context',
+    '4. **Write** with `memgrid_add`:',
+    '   - `insight` — decision, lesson, discovery',
+    '   - `fact` — knowledge, architecture, tech stack',
+    '   - `event` — release, PR merge, deployment',
+    '   - `preference` — habit, rule, style change',
     '',
     '```',
-    '# Search project memory',
-    'memgrid_search(query="your task description", maxResults=10)',
+    '# Extract candidates from conversation',
+    'memgrid_extract(conversation="...")',
     '',
-    '# After completing a task',
-    'memgrid_suggest(taskSummary="what you did", outcome="result")',
+    '# Write refined memory',
+    'memgrid_add(type="insight", summary="...", description="...")',
     '',
-    '# Review candidate memories',
+    '# Review and accept candidates',
     'memgrid_review(action="list")  → memgrid_review(action="accept", unitId="id")',
     '```',
     '',
