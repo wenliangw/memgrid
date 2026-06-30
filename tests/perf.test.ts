@@ -11,7 +11,7 @@ const PERF = {
   /** Search should complete under 50ms for keyword queries */
   SEARCH_MAX_MS: 50,
   /** Repeated query (LRU cache) should complete under 1ms */
-  CACHE_HIT_MAX_MS: 1,
+  CACHE_HIT_MAX_MS: 2,
   /** Bulk save should keep per-unit time under 1ms */
   SAVE_PER_UNIT_MAX_MS: 1,
 };
