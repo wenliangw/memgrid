@@ -1,0 +1,17 @@
+#!/bin/bash
+# Auto-format staged files before commit
+set -e
+
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.ts$' || true)
+
+if [ -n "$STAGED_TS" ]; then
+  echo "🎨 Formatting staged TypeScript files..."
+  echo "$STAGED_TS" | xargs npx prettier --write 2>/dev/null
+  
+  # Re-add formatted files
+  echo "$STAGED_TS" | xargs git add 2>/dev/null
+  
+  # Run ESLint on staged files
+  echo "🔍 Running ESLint..."
+  npx eslint $STAGED_TS --quiet 2>/dev/null || true
+fi
