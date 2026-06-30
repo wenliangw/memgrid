@@ -2,6 +2,25 @@
 
 All notable changes to MemGrid.
 
+## v0.10.0-beta.4 — Auto Migration + Extract Engine (2026-06-30)
+
+### Added
+- **Auto-migration**: `memgrid init --server` now automatically detects existing
+  OpenClaw memory files (MEMORY.md, memory/**/*.md) and migrates them:
+  - Short content (≤500 chars) → memory unit
+  - Long content (>500 chars) → library document + memory unit with `library_ref`
+  - Original files preserved (not deleted)
+  - Skips already-migrated content (idempotent)
+  - Migration report on completion
+- **smart type inference**: auto-detects fact/insight/event/preference from filename
+  and content patterns during migration
+- **keyword extraction**: automatic TF-based keyword generation for migrated content
+
+### Removed
+- Static `MIGRATION.md` guide — replaced by automatic migration
+
+---
+
 ## v0.10.0-beta.3 — Cognitive Type System + Library (2026-06-30)
 
 ### Breaking Changes
