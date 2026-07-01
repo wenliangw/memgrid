@@ -5,6 +5,8 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
+import * as path from 'path';
+import * as fs from 'fs';
 import { MemGrid } from '../memgrid.js';
 import type { MemoryUnitType, LegacyMemoryUnitType } from '../shared/types.js';
 
@@ -28,8 +30,10 @@ const LEGACY_ACCEPTED: LegacyMemoryUnitType[] = [
 export class MemGridServer {
   private server: Server;
   private mg: MemGrid;
+  private projectRoot: string;
 
   constructor(projectRoot: string) {
+    this.projectRoot = projectRoot;
     this.mg = new MemGrid(projectRoot);
     this.server = new Server(
       { name: 'memgrid', version: '0.8.0' },
@@ -38,6 +42,23 @@ export class MemGridServer {
 
     this.registerTools();
     this.registerHandlers();
+  }
+
+  /**
+   * Resolve the MemGrid instance for a given domain.
+   * When no domain is provided, fall back to the default (constructor root).
+   */
+  private resolveDomain(domain?: string): MemGrid {
+    if (!domain) return this.mg;
+    // domain can be a full path or a name relative to user grid sessions/
+    if (path.isAbsolute(domain) && fs.existsSync(domain)) {
+      return new MemGrid(domain);
+    }
+    const sessionsDir = path.join(this.projectRoot, 'sessions', domain);
+    if (fs.existsSync(sessionsDir)) {
+      return new MemGrid(sessionsDir);
+    }
+    return this.mg;
   }
 
   private registerTools(): void {
@@ -57,6 +78,12 @@ export class MemGridServer {
               query: {
                 type: 'string',
                 description: 'What are you trying to do? Describe the task in natural language.',
+              },
+              domain: {
+                type: 'string',
+                description:
+                  'Domain name (e.g. "小明", "晚晚") or full path to .memgrid dir. ' +
+                  "Use to search another agent's memory. Omit for current/default domain.",
               },
               maxResults: {
                 type: 'number',
@@ -169,6 +196,10 @@ export class MemGridServer {
                 description: 'List of files that were modified or created',
                 items: { type: 'string' },
               },
+              domain: {
+                type: 'string',
+                description: 'Domain name or path. Omit for current/default domain.',
+              },
             },
             required: ['taskSummary', 'outcome'],
           },
@@ -193,6 +224,10 @@ export class MemGridServer {
                 type: 'string',
                 description: 'Unit ID to accept/reject (not needed for list/accept-all/reject-all)',
               },
+              domain: {
+                type: 'string',
+                description: 'Domain name or path. Omit for current/default domain.',
+              },
             },
             required: ['action'],
           },
@@ -206,7 +241,12 @@ export class MemGridServer {
             'Call this periodically to catch contradictory memories before they affect decisions.',
           inputSchema: {
             type: 'object',
-            properties: {},
+            properties: {
+              domain: {
+                type: 'string',
+                description: 'Domain name or path. Omit for current/default domain.',
+              },
+            },
           },
         },
         {
@@ -217,7 +257,12 @@ export class MemGridServer {
             'Cold overflow triggers freezing of lowest-retention units.',
           inputSchema: {
             type: 'object',
-            properties: {},
+            properties: {
+              domain: {
+                type: 'string',
+                description: 'Domain name or path. Omit for current/default domain.',
+              },
+            },
           },
         },
         {
@@ -232,6 +277,10 @@ export class MemGridServer {
               clue: {
                 type: 'string',
                 description: 'Exact keyword, method name, or phrase to find in frozen memories',
+              },
+              domain: {
+                type: 'string',
+                description: 'Domain name or path. Omit for current/default domain.',
               },
             },
             required: ['clue'],
@@ -248,6 +297,10 @@ export class MemGridServer {
               unitId: {
                 type: 'string',
                 description: 'ID of the frozen unit to restore',
+              },
+              domain: {
+                type: 'string',
+                description: 'Domain name or path. Omit for current/default domain.',
               },
             },
             required: ['unitId'],
@@ -310,6 +363,10 @@ export class MemGridServer {
                 type: 'string',
                 description: 'ID of the unit to archive',
               },
+              domain: {
+                type: 'string',
+                description: 'Domain name or path. Omit for current/default domain.',
+              },
             },
             required: ['unitId'],
           },
@@ -359,9 +416,11 @@ export class MemGridServer {
             const maxResults = Math.min((args as any).maxResults || 10, 20);
             const maxHops = Math.min((args as any).maxHops || 2, 3);
             const semanticWeight = (args as any).semanticWeight ?? 0.4;
+            const domain = (args as any).domain as string | undefined;
+            const target = this.resolveDomain(domain);
 
-            const result = await this.mg.search(query, { maxResults, maxHops, semanticWeight });
-            const context = this.mg.context(result);
+            const result = await target.search(query, { maxResults, maxHops, semanticWeight });
+            const context = target.context(result);
 
             return {
               content: [
@@ -454,18 +513,19 @@ export class MemGridServer {
           }
 
           case 'memgrid_suggest': {
-            const { taskSummary, outcome, filesModified } = args as any;
-            const suggestions = await this.mg.analyzeTask({
+            const { taskSummary, outcome, filesModified, domain } = args as any;
+            const target = this.resolveDomain(domain);
+            const suggestions = await target.analyzeTask({
               summary: taskSummary,
               outcome: outcome,
               filesModified: filesModified || [],
             });
 
             // v0.8: apply suggestions as CANDIDATE, not active
-            const applied = await this.mg.applySuggestions(suggestions, { status: 'candidate' });
+            const applied = await target.applySuggestions(suggestions, { status: 'candidate' });
 
             const text =
-              this.mg.formatSuggestions(suggestions) +
+              target.formatSuggestions(suggestions) +
               '\n### 📝 Candidates (need review)\n' +
               applied.map((a: string) => '  ' + a).join('\n') +
               '\n\n⚠️ These are candidate memories. They will NOT appear in search results until confirmed.' +
@@ -475,8 +535,9 @@ export class MemGridServer {
           }
 
           case 'memgrid_review': {
-            const { action, unitId } = args as any;
-            const allUnits = this.mg.store.listUnitsSync?.() || [];
+            const { action, unitId, domain } = args as any;
+            const target = this.resolveDomain(domain);
+            const allUnits = target.store.listUnitsSync?.() || [];
             const candidates = allUnits.filter((u) => u.meta.status === 'candidate');
 
             switch (action) {
@@ -521,7 +582,7 @@ export class MemGridServer {
                     isError: true,
                   };
                 }
-                await this.mg.acceptCandidate(unitId);
+                await target.acceptCandidate(unitId);
                 return {
                   content: [
                     {
@@ -546,7 +607,7 @@ export class MemGridServer {
                     isError: true,
                   };
                 }
-                await this.mg.archive(unitId);
+                await target.archive(unitId);
                 return {
                   content: [
                     {
@@ -565,7 +626,7 @@ export class MemGridServer {
                 }
                 let count = 0;
                 for (const c of candidates) {
-                  await this.mg.acceptCandidate(c.id);
+                  await target.acceptCandidate(c.id);
                   count++;
                 }
                 return {
@@ -586,7 +647,7 @@ export class MemGridServer {
                 }
                 let count = 0;
                 for (const c of candidates) {
-                  await this.mg.archive(c.id);
+                  await target.archive(c.id);
                   count++;
                 }
                 return {
@@ -613,7 +674,9 @@ export class MemGridServer {
           }
 
           case 'memgrid_conflicts': {
-            const conflicts = this.mg.detectConflicts();
+            const { domain } = args as any;
+            const target = this.resolveDomain(domain);
+            const conflicts = target.detectConflicts();
 
             if (conflicts.length === 0) {
               return {
@@ -643,7 +706,9 @@ export class MemGridServer {
           }
 
           case 'memgrid_rebalance': {
-            const result = await this.mg.rebalance();
+            const { domain } = args as any;
+            const target = this.resolveDomain(domain);
+            const result = await target.rebalance();
             const lines = [
               '⚖️  Memory tiers rebalanced:\n',
               `  🔥 Hot:    ${result.hot}`,
@@ -663,8 +728,9 @@ export class MemGridServer {
           }
 
           case 'memgrid_search_frozen': {
-            const { clue } = args as any;
-            const results = this.mg.searchFrozen(clue);
+            const { clue, domain } = args as any;
+            const target = this.resolveDomain(domain);
+            const results = target.searchFrozen(clue);
 
             if (results.length === 0) {
               return {
@@ -686,8 +752,9 @@ export class MemGridServer {
           }
 
           case 'memgrid_thaw': {
-            const { unitId } = args as any;
-            const unit = await this.mg.thaw(unitId);
+            const { unitId, domain } = args as any;
+            const target = this.resolveDomain(domain);
+            const unit = await target.thaw(unitId);
             if (unit) {
               return {
                 content: [
@@ -734,8 +801,9 @@ export class MemGridServer {
           }
 
           case 'memgrid_archive': {
-            const { unitId } = args as any;
-            await this.mg.archive(unitId);
+            const { unitId, domain } = args as any;
+            const target = this.resolveDomain(domain);
+            await target.archive(unitId);
             return {
               content: [
                 { type: 'text', text: `🗄️  Archived: ${unitId}\n   Excluded from search results.` },
@@ -745,7 +813,8 @@ export class MemGridServer {
 
           case 'memgrid_extract': {
             const { conversation, domain, autoAccept } = args as any;
-            const { raw } = this.mg.extract.extract(conversation || '');
+            const target = this.resolveDomain(domain);
+            const { raw } = target.extract.extract(conversation || '');
 
             if (raw.length === 0) {
               return {
@@ -758,20 +827,16 @@ export class MemGridServer {
             const saved: string[] = [];
             for (const candidate of raw) {
               const status = autoAccept && candidate.confidence >= 0.8 ? 'active' : 'candidate';
-              const unit = this.mg.extract.toMemoryUnit(
-                candidate,
-                domain || 'conversation',
-                status,
-              );
+              const unit = target.extract.toMemoryUnit(candidate, domain || 'conversation', status);
               // Check for near-duplicates before saving
-              const existing = this.mg.store.listUnitsSync({ includeCandidate: true }) || [];
+              const existing = target.store.listUnitsSync({ includeCandidate: true }) || [];
               const isDuplicate = existing.some(
                 (u) =>
                   u.summary.slice(0, 40).toLowerCase() ===
                   candidate.summary.slice(0, 40).toLowerCase(),
               );
               if (!isDuplicate) {
-                this.mg.store.saveUnit(unit);
+                target.store.saveUnit(unit);
                 saved.push(`${unit.id}: [${unit.type}] ${unit.summary}`);
               }
             }
