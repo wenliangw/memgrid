@@ -2,6 +2,8 @@
 
 > AI 编程智能体的认知记忆引擎。一个人，一个网格。
 
+> ⚠️ **早期阶段提示：** MemGrid 正在活跃开发中，版本迭代频繁，API 可能在版本间发生不兼容变更。目前尚未达到稳定状态。升级时建议查看 [CHANGELOG](./CHANGELOG.md) 了解变更内容。
+
 <p align="center">
   <a href="https://www.npmjs.com/package/memgrid"><img src="https://img.shields.io/npm/v/memgrid?color=blue" alt="npm"></a>
   <a href="https://github.com/wenliangw/memgrid/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/memgrid" alt="license"></a>
