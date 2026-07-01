@@ -1525,7 +1525,7 @@ function extractKeywords(text: string): string[] {
 /** Read version from package.json — never hardcoded */
 function readPackageVersion(): string {
   const candidates = [
-    path.join(path.dirname(process.argv[1] || ''), '..', 'package.json'),
+    path.join(path.dirname(process.argv[1] || ''), '..', '..', 'package.json'),
     path.join(process.cwd(), 'package.json'),
   ];
   for (const p of candidates) {
