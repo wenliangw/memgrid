@@ -1609,8 +1609,7 @@ function registerOpenClawMcp(configPath: string, domainPath?: string): void {
 function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void {
   const existing = fs.readFileSync(agentsMdPath, 'utf-8');
 
-  const workspaceDir = path.dirname(agentsMdPath);
-  const domainPath = workspaceDir;
+  const domainName = agentName;
 
   const newBlock = [
     '',
@@ -1620,11 +1619,11 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
     '',
     'This agent has access to MemGrid memory tools. Your memory domain:',
     '',
-    `- **Domain:** \`${domainPath}\``,
+    `- **Domain:** \`${domainName}\``,
     '',
     '### Search (before every task)',
     '```',
-    `memgrid_search(query="your task description", domain="${domainPath}", maxResults=10)`,
+    `memgrid_search(query="your task description", domain="${domainName}", maxResults=10)`,
     '```',
     '',
     '### Remember (after every turn)',
@@ -1646,13 +1645,13 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
     '',
     '```',
     '# Extract candidates from conversation',
-    `memgrid_extract(conversation="...", domain="${domainPath}")`,
+    `memgrid_extract(conversation="...", domain="${domainName}")`,
     '',
     '# Write refined memory',
-    `memgrid_add(type="insight", summary="...", description="...", domain="${domainPath}")`,
+    `memgrid_add(type="insight", summary="...", description="...", domain="${domainName}")`,
     '',
     '# Review and accept candidates',
-    `memgrid_review(action="list", domain="${domainPath}")  → memgrid_review(action="accept", unitId="id", domain="${domainPath}")`,
+    `memgrid_review(action="list", domain="${domainName}")  → memgrid_review(action="accept", unitId="id", domain="${domainName}")`,
     '```',
     '',
     '<!-- MEMGRID:END -->',
