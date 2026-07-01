@@ -1524,23 +1524,48 @@ function extractKeywords(text: string): string[] {
     .map(([w]) => w);
 }
 
-/** Read version from package.json — never hardcoded */
-function readPackageVersion(): string {
-  const candidates = [
-    path.join(path.dirname(process.argv[1] || ''), '..', '..', 'package.json'),
-    path.join(process.cwd(), 'package.json'),
-  ];
-  for (const p of candidates) {
+/**
+ * Search upward from a starting directory for a package.json with a version field.
+ * Used to resolve the CLI's own version at runtime without hardcoding.
+ */
+function searchUpwardForVersion(startDir: string): string | null {
+  let dir = path.resolve(startDir);
+  for (let i = 0; i < 10; i++) {
+    const pkgPath = path.join(dir, 'package.json');
     try {
-      if (fs.existsSync(p)) {
-        const v = JSON.parse(fs.readFileSync(p, 'utf-8')).version;
-        if (v) return v;
+      if (fs.existsSync(pkgPath)) {
+        const v = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version;
+        if (v && pkgPath.includes('memgrid')) return v;
       }
     } catch {
-      /* try next */
+      /* keep walking */
     }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
-  return '0.10.0'; // fallback
+  return null;
+}
+
+function readPackageVersion(): string {
+  // 1) Walk upward from the resolved CLI entry (follows symlinks)
+  const argv1 = process.argv[1] || '';
+  if (argv1) {
+    // ESM shebang can produce file:// URLs; strip protocol
+    const entryPath = argv1.startsWith('file://') ? argv1.replace(/^file:\/\//, '') : argv1;
+    // Follow symlinks (e.g. nvm bin/memgrid → lib/node_modules/memgrid/dist/serve/cli.js)
+    let resolvedEntry: string;
+    try {
+      resolvedEntry = fs.realpathSync(entryPath);
+    } catch {
+      resolvedEntry = entryPath;
+    }
+    const v = searchUpwardForVersion(path.dirname(resolvedEntry));
+    if (v) return v;
+  }
+
+  // 2) Fallback: walk upward from cwd (project-local installs)
+  return searchUpwardForVersion(process.cwd()) || '0.0.0-unknown';
 }
 
 /** Auto-register MemGrid MCP server in OpenClaw Gateway's openclaw.json */
