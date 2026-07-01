@@ -45,6 +45,12 @@ Auto-detects your OpenClaw agents, creates per-agent session domains for convers
 
 Restart OpenClaw Gateway — done.
 
+### ⚠️ Note for OpenClaw users migrating from `memory_search`
+
+If your agent's `AGENTS.md` already has instructions for `memory_search`, `memory_get`, or `memory/atoms/`, remove those sections. MemGrid replaces them — keeping both will confuse the agent. See the MemGrid block (`<!-- MEMGRID:START -->`) for the correct instructions.
+
+`memgrid init` does **not** modify your existing content — it only appends the MemGrid block. Manual cleanup of old memory instructions is recommended.
+
 ## How It Works
 
 ```

@@ -45,6 +45,12 @@ memgrid init --server
 
 重启 OpenClaw Gateway 即可。
 
+### ⚠️ 从 OpenClaw 内置记忆迁移的注意事项
+
+如果你的 `AGENTS.md` 中已有 `memory_search`、`memory_get` 或 `memory/atoms/` 相关说明，请将它们删除。MemGrid 已完全替代这些功能——保留两份会让智能体困惑，不知道该用哪个。查看 MemGrid 块（`<!-- MEMGRID:START -->`）获取正确用法。
+
+`memgrid init` **不会**修改你已有的内容——它只在末尾追加 MemGrid 块。请手动清理旧的记忆检索指令。
+
 ## 工作方式
 
 ```
