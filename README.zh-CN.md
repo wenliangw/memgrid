@@ -45,6 +45,14 @@ memgrid init --server
 
 重启 OpenClaw Gateway 即可。
 
+### ⚠️ 开始前 — 从现有记忆工具迁移
+
+**OpenClaw 用户：** 如果你的 `AGENTS.md` 中已有 `memory_search`、`memory_get` 或 `memory/atoms/` 相关说明，请将它们删除。MemGrid 已完全替代这些功能——保留两份会让智能体困惑。
+
+**Claude Code 用户：** 如果你的 `CLAUDE.md` 已有自己的记忆说明，保留它们——但添加 MemGrid 块（`<!-- MEMGRID:START -->`），让 MemGrid 处理项目记忆。你的自定义说明（编码风格、项目规则）仍然应该留在 `CLAUDE.md` 中——那才是它们的家。
+
+`memgrid init` **不会**修改你已有的内容——它只在末尾追加 MemGrid 块。请检查并清理旧配置。
+
 ## 工作方式
 
 ```

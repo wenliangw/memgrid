@@ -45,6 +45,14 @@ Auto-detects your OpenClaw agents, creates per-agent session domains for convers
 
 Restart OpenClaw Gateway — done.
 
+### ⚠️ Before you start — migrating from existing memory tools
+
+**OpenClaw Gatewa users:** If your agent's `AGENTS.md` already has instructions for `memory_search`, `memory_get`, or `memory/atoms/`, remove those sections. MemGrid replaces them — keeping both will confuse the agent.
+
+**Claude Code users:** If your `CLAUDE.md` has its own memory instructions, keep them — but add the MemGrid block (`<!-- MEMGRID:START -->`) and let MemGrid handle project memory. Your custom instructions (coding style, project rules) should still live in `CLAUDE.md` — that's where they belong.
+
+`memgrid init` does **not** modify your existing content — it only appends the MemGrid block. Review and clean up as needed.
+
 ## How It Works
 
 ```
