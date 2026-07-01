@@ -983,6 +983,8 @@ function injectClaudeMdBlock(projectRoot: string, domainName: string): void {
     '',
     `This project uses MemGrid for persistent memory. Search before each task.`,
     '',
+    `- **Domain:** \`${projectRoot}\``,
+    '',
     '### Usage',
     '```bash',
     '# Search before starting work',
@@ -992,7 +994,7 @@ function injectClaudeMdBlock(projectRoot: string, domainName: string): void {
     'npx memgrid sync',
     '```',
     '',
-    'MCP tools: `memgrid_search`, `memgrid_add`, `memgrid_extract`, `memgrid_review`',
+    `MCP tools: \`memgrid_search\`, \`memgrid_add\`, \`memgrid_extract\`, \`memgrid_review\` — use \`domain="${projectRoot}"\` in all calls.`,
     '',
     '<!-- MEMGRID:END -->',
   ].join('\n');
@@ -1005,8 +1007,8 @@ function injectClaudeMdBlock(projectRoot: string, domainName: string): void {
 
   const existing = fs.readFileSync(claudeMdPath, 'utf-8');
   if (existing.includes('<!-- MEMGRID:START -->')) {
-    // Update if outdated (missing memgrid_extract)
-    if (existing.includes('memgrid_extract')) {
+    // Update if outdated (missing domain or memgrid_extract)
+    if (existing.includes('domain=') && existing.includes('memgrid_extract')) {
       console.log('  CLAUDE.md: MemGrid block already up-to-date');
       return;
     }
@@ -1582,17 +1584,22 @@ function registerOpenClawMcp(configPath: string, domainPath?: string): void {
 function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void {
   const existing = fs.readFileSync(agentsMdPath, 'utf-8');
 
+  const workspaceDir = path.dirname(agentsMdPath);
+  const domainPath = workspaceDir;
+
   const newBlock = [
     '',
     '<!-- MEMGRID:START -->',
     '',
     '## 🧠 MemGrid — Memory System',
     '',
-    'This agent has access to MemGrid memory tools.',
+    'This agent has access to MemGrid memory tools. Your memory domain:',
+    '',
+    `- **Domain:** \`${domainPath}\``,
     '',
     '### Search (before every task)',
     '```',
-    'memgrid_search(query="your task description", maxResults=10)',
+    `memgrid_search(query="your task description", domain="${domainPath}", maxResults=10)`,
     '```',
     '',
     '### Remember (after every turn)',
@@ -1614,13 +1621,13 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
     '',
     '```',
     '# Extract candidates from conversation',
-    'memgrid_extract(conversation="...")',
+    `memgrid_extract(conversation="...", domain="${domainPath}")`,
     '',
     '# Write refined memory',
-    'memgrid_add(type="insight", summary="...", description="...")',
+    `memgrid_add(type="insight", summary="...", description="...", domain="${domainPath}")`,
     '',
     '# Review and accept candidates',
-    'memgrid_review(action="list")  → memgrid_review(action="accept", unitId="id")',
+    `memgrid_review(action="list", domain="${domainPath}")  → memgrid_review(action="accept", unitId="id", domain="${domainPath}")`,
     '```',
     '',
     '<!-- MEMGRID:END -->',
@@ -1629,8 +1636,8 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
   const blockText = newBlock.join('\n') + '\n';
 
   if (existing.includes('<!-- MEMGRID:START -->')) {
-    // Check if existing block is outdated (old version has memgrid_suggest, not memgrid_extract)
-    if (existing.includes('memgrid_extract')) {
+    // Check if existing block is outdated (old version lacks domain or has memgrid_suggest)
+    if (existing.includes('domain=') && existing.includes('memgrid_extract')) {
       console.log(`     AGENTS.md: MemGrid block already up-to-date`);
       return;
     }
