@@ -2,6 +2,18 @@
 
 All notable changes to MemGrid.
 
+## v0.10.3 — Fix Version Detection in nvm (2026-07-01)
+
+### Fixed
+- **`--version` returns correct value in nvm environments**: `readPackageVersion()` was
+  resolving `process.argv[1]` through the nvm symlink (`bin/memgrid`) instead of the
+  real path, causing it to walk upward from `bin/` and never find the memgrid
+  `package.json`. Now uses `fs.realpathSync()` to resolve symlinks before searching.
+- **Replaced `__dirname`-based approach**: `__dirname` is `undefined` in ES modules.
+  Switched to `searchUpwardForVersion()` that walks directory ancestors.
+- **Fallback changed** from hardcoded `'0.10.0'` to `'0.0.0-unknown'` to avoid misleading
+  version reports.
+
 ## v0.10.2 — Fix Agent Domain Isolation (2026-07-01)
 
 ### Fixed
