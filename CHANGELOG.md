@@ -2,6 +2,19 @@
 
 All notable changes to MemGrid.
 
+## v0.10.1 — Cross-Domain CRUD + Pre-Commit + Rules Ingestion (2026-07-01)
+
+### Added
+- **Cross-domain CRUD**: `memgrid_add` supports optional `domain` parameter for writing
+  to any domain (not just the current one). `memgrid_update` and `memgrid_archive` MCP tools added.
+- **Pre-commit hook**: `.githooks/pre-commit` auto-formats and lints staged files on every commit.
+  `pinst` for disabled-by-default, activated on `npm install`.
+- **Rules auto-ingestion**: `memgrid init` now extracts rules from AGENTS.md/CLAUDE.md as
+  memory units and auto-updates MemGrid blocks in discovered agent configs.
+
+### Fixed
+- Relaxed perf LRU cache threshold to accommodate CI variance.
+
 ## v0.10.0 — Cognitive Memory Engine (2026-06-30)
 
 First stable release of the v0.10 architecture. Upgrades MemGrid from a project memory tool to a **personal cognitive grid engine** — one person, one grid, multiple domains.
@@ -38,6 +51,18 @@ First stable release of the v0.10 architecture. Upgrades MemGrid from a project 
 - Claude Code: one-command setup via `memgrid init`
 - OpenClaw Gateway: `memgrid init --server` auto-detects agents
 - AGENTS.md injection template updated with extract + refine workflow
+
+### Cross-Domain CRUD
+- `memgrid_add` supports optional `domain` parameter for cross-domain memory routing
+- `memgrid_update` and `memgrid_archive` MCP tools added
+
+### Pre-Commit Hook
+- Auto-format + lint on every commit via `.githooks/pre-commit`
+- Prettier + ESLint on staged files only
+
+### Rules Ingestion
+- `memgrid init` auto-extracts rules from AGENTS.md/CLAUDE.md as memory units
+- Auto-updates MemGrid blocks in discovered agent configs
 
 ### Polish
 - CLI version reads from package.json (no more hardcoded stale versions)
