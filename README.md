@@ -2,6 +2,8 @@
 
 > A cognitive memory engine for AI coding agents. One person, one grid.
 
+> ⚠️ **Early Stage Notice:** MemGrid is under active development and iterating rapidly. APIs may introduce breaking changes across versions. It is not yet considered stable. We recommend tracking the latest release and checking the [CHANGELOG](./CHANGELOG.md) when upgrading.
+
 <p align="center">
   <a href="https://www.npmjs.com/package/memgrid"><img src="https://img.shields.io/npm/v/memgrid?color=blue" alt="npm"></a>
   <a href="https://github.com/wenliangw/memgrid/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/memgrid" alt="license"></a>
