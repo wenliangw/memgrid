@@ -2,6 +2,17 @@
 
 All notable changes to MemGrid.
 
+## v0.10.2 — Fix Agent Domain Isolation (2026-07-01)
+
+### Fixed
+- **AGENTS.md / CLAUDE.md examples now include `domain` param**: memgrid init previously
+  injected example calls (search/extract/add/review) without a `domain` argument, which
+  could cause agents in multi-domain setups to read the wrong memory domain. The injected
+  block now auto-detects the workspace directory and includes `domain="<path>"` in all
+  example calls plus a `- **Domain:**` header showing the current domain.
+- **Up-to-date detection upgraded**: existing blocks are only considered current when they
+  contain both `domain=` and `memgrid_extract` (previously only checked for `memgrid_extract`).
+
 ## v0.10.1 — Cross-Domain CRUD + Pre-Commit + Rules Ingestion (2026-07-01)
 
 ### Added
