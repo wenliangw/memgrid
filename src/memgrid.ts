@@ -600,6 +600,23 @@ export class MemGrid {
     return result;
   }
 
+  /**
+   * Git-diff-aware sync — detects changes via git instead of full hash comparison.
+   * Much faster when the project is a git repo and only a few files changed.
+   * Falls back to standard hash-based sync if not a git repo.
+   */
+  async gitSync(options: SyncOptions): Promise<SyncResult> {
+    this.store.load();
+    const result = await this.syncEngine.syncFromGitDiff(options);
+
+    // Auto-rebalance tiers after sync (v0.9+)
+    if (result.changedFiles.length > 0 || result.candidateUnitsCreated > 0) {
+      await this.rebalance();
+    }
+
+    return result;
+  }
+
   async stats() {
     this.store.load();
     const cached = this.store.getStats();
@@ -610,5 +627,130 @@ export class MemGrid {
       lastScanAt: grid?.lastScanAt || null,
       version: grid?.version || '0.1.0',
     };
+  }
+
+  // ===== Cross-Domain Search (v0.12+) =====
+
+  /**
+   * Search across multiple domains, merging and ranking results.
+   * Useful when an agent wants to find memories from personality domain
+   * or other project domains.
+   *
+   * @param query — search query
+   * @param domains — list of MemGrid instances for other domains
+   * @param options — search options (maxResults applies per-domain, then merged)
+   */
+  async crossDomainSearch(
+    query: string,
+    domains: Array<{ name: string; grid: MemGrid }>,
+    options?: SearchOptions,
+  ): Promise<SearchResult & { domainResults: Array<{ domain: string; count: number }> }> {
+    this.store.load();
+
+    // Search current domain first
+    const localResult = await this.search(query, options);
+    const allUnits = [...localResult.units];
+    const domainResults: Array<{ domain: string; count: number }> = [
+      { domain: 'local', count: localResult.units.length },
+    ];
+
+    // Search other domains in parallel
+    const crossResults = await Promise.all(
+      domains.map(async ({ name, grid }) => {
+        try {
+          const result = await grid.search(query, {
+            ...options,
+            maxResults: options?.maxResults ?? 5,
+          });
+          return { domain: name, units: result.units };
+        } catch {
+          return { domain: name, units: [] as MemoryUnit[] };
+        }
+      }),
+    );
+
+    for (const { domain, units } of crossResults) {
+      domainResults.push({ domain, count: units.length });
+      // Merge, skip duplicates by ID
+      const existingIds = new Set(allUnits.map((u) => u.id));
+      for (const unit of units) {
+        if (!existingIds.has(unit.id)) {
+          allUnits.push(unit);
+          existingIds.add(unit.id);
+        }
+      }
+    }
+
+    return {
+      query,
+      units: allUnits,
+      totalHops: localResult.totalHops,
+      elapsedMs: localResult.elapsedMs,
+      domainResults,
+    };
+  }
+
+  // ===== Auto-Forgetting Detection (v0.12+) =====
+
+  /**
+   * Detect units that should be considered for automatic forgetting.
+   * Criteria: stale+60d unaccessed, cold+freshness<0.1, broken associations, low confidence+unused.
+   */
+  async detectForgettable(options?: {
+    minDaysStale?: number;
+    freshnessThreshold?: number;
+    autoArchive?: boolean;
+  }): Promise<{ candidates: MemoryUnit[]; autoArchived: number; reasons: Map<string, string> }> {
+    this.store.load();
+    const allUnits = this.store.listUnitsSync({ includeCandidate: true }) || [];
+    const activeUnits = new Map<string, MemoryUnit>();
+    for (const u of allUnits) {
+      if (u.meta.status === 'active' || u.meta.status === 'stale') activeUnits.set(u.id, u);
+    }
+    const minDays = options?.minDaysStale ?? 60;
+    const freshnessThreshold = options?.freshnessThreshold ?? 0.1;
+    const now = Date.now();
+    const candidates: MemoryUnit[] = [];
+    const reasons = new Map<string, string>();
+    for (const [id, unit] of activeUnits) {
+      const lastAccess = unit.meta.lastAccessedAt
+        ? new Date(unit.meta.lastAccessedAt).getTime()
+        : new Date(unit.meta.updated).getTime();
+      const daysSinceAccess = (now - lastAccess) / (24 * 60 * 60 * 1000);
+      if (unit.meta.status === 'stale' && daysSinceAccess >= minDays) {
+        candidates.push(unit);
+        reasons.set(id, `Stale for ${Math.round(daysSinceAccess)} days`);
+      } else if (
+        unit.meta.tier === 'cold' &&
+        (unit.meta.freshness_score ?? 0.5) < freshnessThreshold
+      ) {
+        candidates.push(unit);
+        reasons.set(id, `Cold tier, freshness ${(unit.meta.freshness_score ?? 0).toFixed(2)}`);
+      } else if (
+        unit.associations.length > 0 &&
+        unit.associations.every((a) => {
+          const t = activeUnits.get(a.to);
+          return !t || t.meta.status === 'archived' || t.meta.status === 'stale';
+        })
+      ) {
+        candidates.push(unit);
+        reasons.set(id, `${unit.associations.length} broken association(s)`);
+      } else if (
+        unit.meta.confidence < 0.3 &&
+        unit.meta.usage_count === 0 &&
+        daysSinceAccess >= 30
+      ) {
+        candidates.push(unit);
+        reasons.set(id, `Low confidence + never used`);
+      }
+    }
+    let autoArchived = 0;
+    if (options?.autoArchive) {
+      for (const unit of candidates) {
+        this.store.archiveUnit(unit.id);
+        autoArchived++;
+      }
+    }
+    return { candidates, autoArchived, reasons };
   }
 }

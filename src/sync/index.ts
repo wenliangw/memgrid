@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { execSync } from 'child_process';
 import type {
   MemoryUnit,
   MemoryGrid,
@@ -699,6 +700,207 @@ export class SyncEngine {
     }
 
     return null;
+  }
+
+  /**
+   * Git-aware incremental sync: uses `git diff` to detect changes more precisely.
+   * Faster than full hash comparison — only scans files that actually changed.
+   *
+   * Falls back to standard sync if the project is not a git repo.
+   */
+  async syncFromGitDiff(options: SyncOptions): Promise<SyncResult & { diffMode: 'git' | 'hash' }> {
+    const t0 = Date.now();
+
+    // Check if git is available
+    const isGitRepo = this.isGitRepo();
+    if (!isGitRepo) {
+      const result = await this.sync(options);
+      return { ...result, diffMode: 'hash' };
+    }
+
+    // Get changed files from git
+    const { changedFiles, deletedFiles } = this.getGitDiff();
+
+    this.store.ensureDirs();
+    this.store.load();
+
+    const grid = this.store.getGrid();
+    const oldSnapshot = grid?.fileSnapshot ?? {};
+
+    // No changes
+    if (changedFiles.length === 0 && deletedFiles.length === 0) {
+      return {
+        changedFiles: [],
+        removedFiles: [],
+        updatedUnits: 0,
+        staleUnits: 0,
+        repairedAssociations: 0,
+        brokenAssociations: 0,
+        newAssociations: 0,
+        detectedPatterns: [],
+        alerts: [],
+        autoLearnedUnits: 0,
+        candidateUnitsCreated: 0,
+        elapsedMs: Date.now() - t0,
+        diffMode: 'git',
+      };
+    }
+
+    // Phase 2: Re-scan only changed files
+    let updatedUnits = 0;
+    const changedSet = new Set(changedFiles);
+    const allUnits = await this.store.listUnits({ includeArchived: false });
+
+    // Mark old units from changed files as stale
+    for (const unit of allUnits) {
+      if (unit.source?.file && changedSet.has(unit.source.file)) {
+        unit.meta.status = 'stale';
+        this.store.saveUnit(unit);
+      }
+    }
+
+    const threshold = options.fuzzyThreshold ?? 0.45;
+    const scannedUnits = await this.scanChangedFiles(changedFiles);
+
+    const staleList = allUnits.filter((u) => u.meta.status === 'stale');
+    for (const newUnit of scannedUnits) {
+      const matched = this.fuzzyMatchUnit(newUnit, staleList, threshold);
+      if (matched) {
+        matched.summary = newUnit.summary;
+        matched.signatures = newUnit.signatures;
+        matched.content = newUnit.content;
+        matched.source = newUnit.source;
+        matched.meta.status = 'active';
+        matched.meta.updated = new Date().toISOString();
+        this.store.saveUnit(matched);
+        updatedUnits++;
+      } else {
+        this.store.saveUnit(newUnit);
+        updatedUnits++;
+      }
+    }
+
+    this.store.reload();
+    const remainingStale = (await this.store.listUnits()).filter(
+      (u) => u.meta.status === 'stale' && u.source?.file && changedFiles.includes(u.source.file),
+    );
+    const staleUnits = remainingStale.length;
+
+    // Phase 3: Handle deleted files
+    if (deletedFiles.length > 0) {
+      const deletedSet = new Set(deletedFiles);
+      const currentUnits = await this.store.listUnits();
+      for (const unit of currentUnits) {
+        if (unit.source?.file && deletedSet.has(unit.source.file)) {
+          unit.meta.status = 'stale';
+          this.store.saveUnit(unit);
+        }
+      }
+    }
+
+    // Phase 4: Repair associations
+    const { repaired, broken } = await this.repairAssociations(threshold);
+
+    // Phase 5: Update snapshot for changed files
+    const newSnapshot = { ...oldSnapshot };
+    for (const file of changedFiles) {
+      const abs = path.join(this.projectRoot, file);
+      if (fs.existsSync(abs)) {
+        newSnapshot[file] = crypto
+          .createHash('sha256')
+          .update(fs.readFileSync(abs, 'utf-8'))
+          .digest('hex');
+      }
+    }
+    for (const file of deletedFiles) {
+      delete newSnapshot[file];
+    }
+
+    const allActiveUnits = await this.store.listUnits({ includeArchived: false });
+    this.updateGrid(allActiveUnits, newSnapshot);
+
+    // Phase 6: Associations from changed code
+    const unitMap = new Map<string, MemoryUnit>();
+    for (const u of allActiveUnits) unitMap.set(u.id, u);
+    const { newAssociations } = analyzeAssociations(this.projectRoot, changedFiles, unitMap);
+
+    // Phase 7: Detect patterns
+    const { patterns } = detectPatterns(this.projectRoot, changedFiles);
+
+    // Phase 8: Architecture checks
+    const { alerts } = checkArchitecture(this.projectRoot, changedFiles, unitMap);
+
+    // Phase 9: Learning engine
+    const { autoUnitsCreated, candidateUnitsCreated } = generateLearnings(
+      this.store,
+      changedFiles,
+      patterns,
+      alerts,
+    );
+
+    return {
+      changedFiles,
+      removedFiles: deletedFiles,
+      updatedUnits,
+      staleUnits: staleUnits + (deletedFiles.length > 0 ? 1 : 0),
+      repairedAssociations: repaired,
+      brokenAssociations: broken,
+      newAssociations,
+      detectedPatterns: patterns,
+      alerts,
+      autoLearnedUnits: autoUnitsCreated,
+      candidateUnitsCreated: candidateUnitsCreated,
+      elapsedMs: Date.now() - t0,
+      diffMode: 'git',
+    };
+  }
+
+  /** Check if current directory is a git repo */
+  private isGitRepo(): boolean {
+    try {
+      execSync('git rev-parse --git-dir', { cwd: this.projectRoot, stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Get files changed since last commit via git diff */
+  private getGitDiff(): { changedFiles: string[]; deletedFiles: string[] } {
+    const result = { changedFiles: [] as string[], deletedFiles: [] as string[] };
+    try {
+      // diff against HEAD~1 (previous commit) or HEAD if no parent exists
+      let diffOutput: string;
+      try {
+        diffOutput = execSync('git diff --name-status HEAD~1 HEAD', {
+          cwd: this.projectRoot,
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        });
+      } catch {
+        // No previous commit — diff against initial commit
+        diffOutput = execSync('git diff --name-status $(git rev-list --max-parents=0 HEAD) HEAD', {
+          cwd: this.projectRoot,
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        });
+      }
+
+      const lines = diffOutput.trim().split('\n').filter(Boolean);
+      for (const line of lines) {
+        const [status, ...filenameParts] = line.split('\t');
+        const filename = filenameParts.join('\t'); // handle filenames with tabs
+        if (status === 'D') {
+          result.deletedFiles.push(filename);
+        } else if (status === 'A' || status === 'M' || status === 'R') {
+          // R = renamed: filename is new_name
+          result.changedFiles.push(filename);
+        }
+      }
+    } catch {
+      // git diff failed — return empty
+    }
+    return result;
   }
 
   private updateGrid(units: MemoryUnit[], fileSnapshot: FileSnapshot): void {
