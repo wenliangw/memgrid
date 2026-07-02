@@ -126,6 +126,8 @@ export interface MemoryUnit {
     tier?: MemoryTier;
     /** Last time this memory was accessed via search or touch (v0.9+) */
     lastAccessedAt?: string;
+    /** Freshness score: 1.0 (just accessed) → 0.0 (stale). Decays over time, boosted on access. (v0.11+) */
+    freshness_score?: number;
   };
   /** Who created this memory and based on what (v0.8+) */
   provenance?: Provenance;
