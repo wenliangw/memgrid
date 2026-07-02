@@ -7,13 +7,24 @@ import type { MemoryUnit, ExtractCandidate } from '../shared/types.js';
  * Mode 2 (LLM): optional refinement via external model — higher quality.
  */
 export class ExtractEngine {
-  private config: { enabled: boolean; model?: string; autoActivateThreshold?: number };
+  private config: {
+    enabled: boolean;
+    model?: string;
+    autoActivateThreshold?: number;
+    lang?: string;
+  };
 
-  constructor(config?: { enabled?: boolean; model?: string; autoActivateThreshold?: number }) {
+  constructor(config?: {
+    enabled?: boolean;
+    model?: string;
+    autoActivateThreshold?: number;
+    lang?: string;
+  }) {
     this.config = {
       enabled: config?.enabled ?? false,
       model: config?.model,
       autoActivateThreshold: config?.autoActivateThreshold ?? 0.8,
+      lang: config?.lang ?? 'en',
     };
   }
 
@@ -32,15 +43,20 @@ export class ExtractEngine {
   private ruleExtract(text: string): ExtractCandidate[] {
     const candidates: ExtractCandidate[] = [];
     const sentences = splitSentences(text);
+    const isZh = this.config.lang === 'zh';
 
     for (const sentence of sentences) {
       const s = sentence.trim();
       if (s.length < 10) continue;
 
       const lower = s.toLowerCase();
+      const hasChinese = isZh || /[\u4e00-\u9fff]/.test(s);
 
       // Decision patterns
-      if (DECISION_PATTERNS.some((p) => p.test(lower))) {
+      const decisionPatterns = hasChinese
+        ? DECISION_PATTERNS_ZH.concat(DECISION_PATTERNS)
+        : DECISION_PATTERNS;
+      if (decisionPatterns.some((p) => p.test(lower))) {
         candidates.push({
           type: 'insight',
           summary: s.slice(0, 80),
@@ -53,7 +69,10 @@ export class ExtractEngine {
       }
 
       // Preference patterns
-      if (PREFERENCE_PATTERNS.some((p) => p.test(lower))) {
+      const preferencePatterns = hasChinese
+        ? PREFERENCE_PATTERNS_ZH.concat(PREFERENCE_PATTERNS)
+        : PREFERENCE_PATTERNS;
+      if (preferencePatterns.some((p) => p.test(lower))) {
         candidates.push({
           type: 'preference',
           summary: s.slice(0, 80),
@@ -66,7 +85,8 @@ export class ExtractEngine {
       }
 
       // Event patterns
-      if (EVENT_PATTERNS.some((p) => p.test(lower))) {
+      const eventPatterns = hasChinese ? EVENT_PATTERNS_ZH.concat(EVENT_PATTERNS) : EVENT_PATTERNS;
+      if (eventPatterns.some((p) => p.test(lower))) {
         candidates.push({
           type: 'event',
           summary: s.slice(0, 80),
@@ -79,7 +99,8 @@ export class ExtractEngine {
       }
 
       // Fact patterns (technical/architecture keywords)
-      if (FACT_PATTERNS.some((p) => p.test(lower))) {
+      const factPatterns = hasChinese ? FACT_PATTERNS_ZH.concat(FACT_PATTERNS) : FACT_PATTERNS;
+      if (factPatterns.some((p) => p.test(lower))) {
         candidates.push({
           type: 'fact',
           summary: s.slice(0, 80),
@@ -151,6 +172,51 @@ Output JSON format:
 }
 
 // ===== Rule patterns =====
+
+// Chinese-specific patterns (loaded when --lang zh or text contains Chinese)
+const DECISION_PATTERNS_ZH = [
+  /决定用/,
+  /选择.*方案/,
+  /最终.*用/,
+  /不用.*改用/,
+  /采用.*方式/,
+  /确定.*方案/,
+  /方案.*是/,
+];
+
+const PREFERENCE_PATTERNS_ZH = [
+  /禁止/,
+  /不允许/,
+  /不(可以|能|准|许)/,
+  /必须(用|使用|避免|注意|检查)/,
+  /以后.*都/,
+  /从现在开始/,
+  /偏好/,
+  /习惯/,
+  /定为/,
+  /(规范|约定|规则).*[是：:]/,
+];
+
+const EVENT_PATTERNS_ZH = [
+  /(发布了|发布.*v\d)/,
+  /(上线了|部署.*完成)/,
+  /(合并.*PR|PR.*合并)/,
+  /创建了/,
+  /(完成|做完|搞定了)/,
+  /测试.*(通过|全绿)/,
+  /CI.*(绿|通过|成功)/,
+];
+
+const FACT_PATTERNS_ZH = [
+  /架构/,
+  /(仓库|repo).*github/,
+  /技术栈/,
+  /部署在/,
+  /服务器/,
+  /端口.*\d+/,
+  /依赖/,
+  /模块/,
+];
 
 const DECISION_PATTERNS = [
   /\b(decided|chose|selected|picked|决定|选择)\b/i,
