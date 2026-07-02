@@ -753,4 +753,65 @@ export class MemGrid {
     }
     return { candidates, autoArchived, reasons };
   }
+
+  // ===== Image Memory (v0.13+) =====
+
+  /**
+   * Store image metadata as a memory unit. The actual image is NOT stored —
+   * only its metadata (key, alt text, OCR, dimensions) for text-based retrieval.
+   *
+   * Use this for: screenshots, design mockups, whiteboard photos, diagrams.
+   */
+  async addImage(params: {
+    id: string;
+    key: string;
+    alt?: string;
+    ocrText?: string;
+    mimeType?: string;
+    width?: number;
+    height?: number;
+    summary?: string;
+  }): Promise<MemoryUnit> {
+    const summary = params.summary || params.alt || `Image: ${params.key.slice(0, 40)}`;
+    const searchText = [params.alt, params.ocrText, summary].filter(Boolean).join(' ');
+
+    return this.add({
+      id: params.id,
+      type: 'fact',
+      summary,
+      narrative: searchText,
+      keywords: this.extractKeywords(searchText),
+      image: {
+        key: params.key,
+        alt: params.alt,
+        ocrText: params.ocrText,
+        mimeType: params.mimeType,
+        dimensions:
+          params.width && params.height
+            ? { width: params.width, height: params.height }
+            : undefined,
+      },
+      source: {
+        type: 'document',
+      },
+    });
+  }
+
+  /**
+   * Search for memories with associated images.
+   */
+  async searchImages(query: string, options?: SearchOptions): Promise<MemoryUnit[]> {
+    const result = await this.search(query, options);
+    return result.units.filter((u) => !!u.image);
+  }
+
+  private extractKeywords(text: string): string[] {
+    return text
+      .toLowerCase()
+      .split(/\W+/)
+      .filter(
+        (t) => t.length > 2 && !['the', 'and', 'for', 'this', 'that', 'with', 'from'].includes(t),
+      )
+      .slice(0, 20);
+  }
 }

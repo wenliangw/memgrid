@@ -96,6 +96,19 @@ export interface MemoryUnit {
     /** Source type: source code, markdown doc, atom, etc. */
     type?: 'code' | 'markdown' | 'atom' | 'document' | 'library';
   };
+  /** Image attachment metadata (v0.13+) */
+  image?: {
+    /** Image key or URL */
+    key: string;
+    /** Image description / alt text — enables text-based search */
+    alt?: string;
+    /** OCR-extracted text if applicable */
+    ocrText?: string;
+    /** MIME type */
+    mimeType?: string;
+    /** Width × Height */
+    dimensions?: { width: number; height: number };
+  };
   /** Function/method signatures (from code scanning) */
   signatures: string[];
   /** @deprecated Use narrative, keywords, code_snippet directly. Kept for backward compat. */
@@ -249,6 +262,8 @@ export interface SearchOptions {
   maxHops?: number;
   semanticWeight?: number;
   tiers?: MemoryTier[];
+  /** LLM retrieval intent: determines strategy (v0.13+) */
+  intent?: 'quick_lookup' | 'explore' | 'audit' | 'deep_dive';
 }
 
 export interface FileScanResult {

@@ -38,6 +38,8 @@ export interface SemanticSearchOptions {
   semanticWeight?: number;
   /** Limit search to specific tiers (v0.9+) */
   tiers?: string[];
+  /** LLM retrieval intent: determines strategy (v0.13+) */
+  intent?: 'quick_lookup' | 'explore' | 'audit' | 'deep_dive';
 }
 
 export class SemanticRetriever {
@@ -101,16 +103,39 @@ export class SemanticRetriever {
     const maxResults = options?.maxResults ?? 10;
     const maxHops = options?.maxHops ?? 2;
     const semanticWeight = options?.semanticWeight ?? 0.4;
+    const intent = options?.intent;
+
+    // Intent-based strategy (v0.13+)
+    // quick_lookup: fewer results, higher precision, keyword bias
+    // explore: more results, more hops, semantic bias — broad then narrow
+    // audit: all tiers, full hops, full results — comprehensive
+    // deep_dive: high semantic weight, deeper hops
+    const effectiveMaxResults =
+      intent === 'audit'
+        ? Math.min(maxResults * 3, 50)
+        : intent === 'explore'
+          ? maxResults * 2
+          : maxResults;
+    const effectiveMaxHops =
+      intent === 'explore' || intent === 'deep_dive' ? Math.max(maxHops, 3) : maxHops;
+    const effectiveSemanticWeight =
+      intent === 'quick_lookup'
+        ? Math.min(semanticWeight, 0.2)
+        : intent === 'deep_dive'
+          ? Math.max(semanticWeight, 0.6)
+          : semanticWeight;
+    const effectiveTiers =
+      intent === 'audit' ? ['hot', 'warm', 'cold', 'frozen'] : ['hot', 'warm', 'cold'];
 
     // Check result cache
-    const cacheKey = `${query}::${maxResults}::${maxHops}::${semanticWeight}`;
+    const cacheKey = `${query}::${effectiveMaxResults}::${effectiveMaxHops}::${effectiveSemanticWeight}`;
     const cached = this.resultCache.get(cacheKey);
     if (cached) return { ...cached, elapsedMs: 0 };
 
     // Step 1: Keyword search (always works)
     const keywordResult = await this.baseEngine.search(query, {
-      maxResults: maxResults * 2,
-      maxHops,
+      maxResults: effectiveMaxResults * 2,
+      maxHops: effectiveMaxHops,
     });
     const keywordScores = new Map<string, number>();
     const allKeywordUnits = new Map<string, MemoryUnit>();
@@ -163,12 +188,12 @@ export class SemanticRetriever {
     }
 
     // Step 4: Apply tier weights (v0.9+) and freshness decay (v0.11+) — then sort
-    const tiers = options?.tiers || ['hot', 'warm', 'cold'];
+    const tiers = effectiveTiers || options?.tiers || ['hot', 'warm', 'cold'];
     const tierWeights: Record<string, number> = {
       hot: 1.0,
       warm: 0.7,
       cold: 0.4,
-      frozen: 0, // not included by default
+      frozen: 0.05, // audit mode: very low weight but accessible
     };
 
     for (const [id, score] of merged) {
@@ -190,7 +215,7 @@ export class SemanticRetriever {
     }
 
     // Sort and take top N
-    const ranked = [...merged.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxResults);
+    const ranked = [...merged.entries()].sort((a, b) => b[1] - a[1]).slice(0, effectiveMaxResults);
 
     const resultUnits = ranked
       .map(([id]) => allKeywordUnits.get(id))
@@ -199,7 +224,7 @@ export class SemanticRetriever {
     const result: SearchResult = {
       query,
       units: resultUnits,
-      totalHops: maxHops,
+      totalHops: effectiveMaxHops,
       elapsedMs: 0,
     };
 
