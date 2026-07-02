@@ -39,7 +39,8 @@ program
   .option('-f, --force', 'Force re-scan even if grid exists')
   .option('--no-rules', 'Skip scanning .claude/rules/')
   .option('--no-examples', 'Skip scanning .claude/examples/')
-  .option('--server', 'Initialize in OpenClaw server mode')
+  .option('--openclaw', 'Initialize in OpenClaw server mode')
+  .option('--server', '[deprecated] Use --openclaw instead')
   .option('--openclaw', 'Generate OpenClaw Gateway config')
   .option('--lang <lang>', 'Language environment: en (default) or zh')
   .action(async (options) => {
@@ -47,7 +48,11 @@ program
     const dm = new DomainManager();
 
     // === Mode 3: OpenClaw Server ===
-    if (options.server) {
+    const isOpenClaw = options.openclaw || options.server;
+    if (options.server && !options.openclaw) {
+      console.log('⚠️  --server is deprecated. Use --openclaw instead.');
+    }
+    if (isOpenClaw) {
       console.log('🖥️  OpenClaw Server — MemGrid — OpenClaw Server Mode\n');
 
       // Init user grid
@@ -67,7 +72,7 @@ program
         console.log(
           '  ⚠️  No agents detected. Use --openclaw-path <path> or create session domains manually.',
         );
-        console.log('     Example: memgrid init --server --domain my-agent');
+        console.log('     Example: memgrid init --openclaw --domain my-agent');
       } else {
         for (const agent of agents) {
           const sessionPath = path.join(dm.gridDir, 'sessions', agent.name);
@@ -1738,7 +1743,7 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
  * this in its memory domain knows it MUST actively write memories after
  * each conversation turn. It is the lowest-level guarantee of the memory system.
  *
- * Injected once during `memgrid init --server`. Already-existing agent domains
+ * Injected once during `memgrid init --openclaw`. Already-existing agent domains
  * are skipped (no duplicate injection).
  */
 function injectMetacognitiveAnchor(sessionDir: string, lang: 'en' | 'zh') {
