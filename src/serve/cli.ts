@@ -41,7 +41,6 @@ program
   .option('--no-examples', 'Skip scanning .claude/examples/')
   .option('--openclaw', 'Initialize in OpenClaw server mode')
   .option('--server', '[deprecated] Use --openclaw instead')
-  .option('--openclaw', 'Generate OpenClaw Gateway config')
   .option('--lang <lang>', 'Language environment: en (default) or zh')
   .action(async (options) => {
     const root = process.cwd();
@@ -162,8 +161,8 @@ program
       // Migrate data from old nested paths (pre-v0.10.4 bug) to correct locations
       migrateNestedPaths(dm);
 
-      // Generate OpenClaw Gateway config
-      if (options.openclaw) {
+      // Generate OpenClaw Gateway config (always in server mode)
+      {
         const configPath = path.join(dm.gridDir, 'openclaw-config.json');
         const config = {
           memoryProvider: 'memgrid',
