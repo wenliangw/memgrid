@@ -100,4 +100,24 @@ describe('FileStore', () => {
     const retrieved = store.getGrid();
     expect(retrieved!.project).toBe('test');
   });
+
+  it('detects grid root and avoids .memgrid/ nesting', () => {
+    // Simulate ~/.memgrid scenario: tmpDir/.memgrid with units/ and mesh.json
+    const gridRoot = path.join(tmpDir, '.memgrid');
+    fs.mkdirSync(path.join(gridRoot, 'units'), { recursive: true });
+    fs.mkdirSync(path.join(gridRoot, 'archive'), { recursive: true });
+    fs.writeFileSync(path.join(gridRoot, 'mesh.json'), '{"version":"0.1"}');
+
+    const gridStore = new FileStore(gridRoot);
+    expect(gridStore.gridDir).toBe(gridRoot);
+    expect(gridStore.unitsDir).toBe(path.join(gridRoot, 'units'));
+  });
+
+  it('uses .memgrid/ subdirectory for normal project roots', () => {
+    const projectRoot = path.join(tmpDir, 'my-project');
+    fs.mkdirSync(projectRoot, { recursive: true });
+
+    const projectStore = new FileStore(projectRoot);
+    expect(projectStore.gridDir).toBe(path.join(projectRoot, '.memgrid'));
+  });
 });

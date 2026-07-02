@@ -73,4 +73,21 @@ describe('RetrieveEngine', () => {
     expect(context).toContain('u1');
     expect(context).toContain('Creates a new user');
   });
+
+  it('updateIndex makes newly saved units searchable immediately', async () => {
+    store.saveUnit(makeUnit('u1', 'dog adoption', 'How to adopt a dog'));
+    // Ensure index is built first time
+    const resultBefore = await engine.search('cat');
+    expect(resultBefore.units).toHaveLength(0);
+
+    // Add new unit and update index
+    const newUnit = makeUnit('u2', 'cat adoption', 'How to adopt a cat');
+    store.saveUnit(newUnit);
+    engine.updateIndex(newUnit);
+
+    // Now it should be searchable
+    const resultAfter = await engine.search('cat');
+    expect(resultAfter.units.length).toBeGreaterThan(0);
+    expect(resultAfter.units.some((u) => u.id === 'u2')).toBe(true);
+  });
 });

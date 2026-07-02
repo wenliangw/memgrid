@@ -7,3 +7,4 @@ node_modules/
 .memgrid/personal/
 .memgrid/
 !tests/fixtures/.memgrid/
+.claude/settings.json\nCLAUDE.md

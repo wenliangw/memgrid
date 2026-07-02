@@ -13,6 +13,11 @@ const UNITS_DIR = 'units';
 const ARCHIVE_DIR = 'archive';
 const MESH_FILE = 'mesh.json';
 
+/** Check if a directory is already a MemGrid root by looking for units/ or mesh.json */
+function isGridRoot(dir: string): boolean {
+  return fs.existsSync(path.join(dir, 'units')) || fs.existsSync(path.join(dir, 'mesh.json'));
+}
+
 export interface ListFilter {
   type?: MemoryUnitType;
   includeArchived?: boolean;
@@ -44,6 +49,9 @@ export class FileStore {
   // ===== Path helpers =====
 
   get gridDir(): string {
+    // If projectRoot is already a MemGrid root (contains units/ or mesh.json),
+    // don't append .memgrid/ again — prevents ~/.memgrid/.memgrid/ nesting.
+    if (isGridRoot(this.projectRoot)) return this.projectRoot;
     return path.join(this.projectRoot, GRID_DIR);
   }
   get unitsDir(): string {

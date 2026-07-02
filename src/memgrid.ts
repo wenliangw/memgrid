@@ -225,6 +225,7 @@ export class MemGrid {
 
     this.store.ensureDirs();
     this.store.saveUnit(fullUnit);
+    this.retrieve.updateIndex(fullUnit);
     return fullUnit;
   }
 
@@ -239,6 +240,7 @@ export class MemGrid {
     unit.meta.status = 'active';
     unit.meta.updated = new Date().toISOString();
     this.store.saveUnit(unit);
+    this.retrieve.updateIndex(unit);
     return unit;
   }
 
@@ -354,6 +356,7 @@ export class MemGrid {
 
   async archive(id: string): Promise<void> {
     this.store.archiveUnit(id);
+    this.retrieve.invalidateIndex();
   }
 
   // ===== Tiered Storage Engine (v0.9+) =====

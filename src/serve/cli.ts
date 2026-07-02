@@ -77,10 +77,10 @@ program
           const docsDir = path.join(sessionPath, 'docs');
           fs.mkdirSync(docsDir, { recursive: true });
 
-          // Ensure MemGrid storage directories exist
-          const mgDir = path.join(sessionPath, '.memgrid');
-          fs.mkdirSync(path.join(mgDir, 'units'), { recursive: true });
-          fs.mkdirSync(path.join(mgDir, 'archive'), { recursive: true });
+          // Pre-create units/ and archive/ directly under sessionPath
+          // so FileStore recognizes it as a grid root (no .memgrid/ nesting)
+          fs.mkdirSync(path.join(sessionPath, 'units'), { recursive: true });
+          fs.mkdirSync(path.join(sessionPath, 'archive'), { recursive: true });
 
           // Init MemGrid domain for this agent
           const mg = new MemGrid(sessionPath);
@@ -153,6 +153,9 @@ program
         const sessionDir = path.join(dm.gridDir, 'sessions', agent.name);
         injectMetacognitiveAnchor(sessionDir, lang);
       }
+
+      // Migrate data from old nested paths (pre-v0.10.4 bug) to correct locations
+      migrateNestedPaths(dm);
 
       // Generate OpenClaw Gateway config
       if (options.openclaw) {
@@ -1748,4 +1751,89 @@ function injectMetacognitiveAnchor(sessionDir: string, lang: 'en' | 'zh') {
 
   mg.store.saveUnit(anchorUnit);
   console.log(`     🧠 Metacognitive anchor injected (${lang})`);
+}
+
+/**
+ * Migrate data from old nested paths (pre-v0.10.4 bug) to correct locations.
+ *
+ * Bug: FileStore used to blindly append .memgrid/ to projectRoot, causing:
+ *   ~/.memgrid/.memgrid/units/  (personality domain)
+ *   ~/.memgrid/sessions/{agent}/.memgrid/units/  (agent domain)
+ *
+ * Fix: FileStore now detects grid roots. This migrates existing data.
+ */
+function migrateNestedPaths(dm: DomainManager): void {
+  let movedPersonality = 0;
+  let movedAgent = 0;
+
+  // 1. Migrate personality domain units: ~/.memgrid/.memgrid/units/ → ~/.memgrid/units/
+  const oldPersonalityUnits = path.join(dm.gridDir, '.memgrid', 'units');
+  const newPersonalityUnits = path.join(dm.gridDir, 'units');
+  if (fs.existsSync(oldPersonalityUnits)) {
+    fs.mkdirSync(newPersonalityUnits, { recursive: true });
+    for (const file of fs.readdirSync(oldPersonalityUnits)) {
+      if (!file.endsWith('.json')) continue;
+      const src = path.join(oldPersonalityUnits, file);
+      const dst = path.join(newPersonalityUnits, file);
+      if (!fs.existsSync(dst)) {
+        fs.copyFileSync(src, dst);
+        movedPersonality++;
+      }
+    }
+  }
+
+  // 2. Migrate agent session domain units
+  const sessionsDir = path.join(dm.gridDir, 'sessions');
+  if (fs.existsSync(sessionsDir)) {
+    for (const agentName of fs.readdirSync(sessionsDir)) {
+      const agentDir = path.join(sessionsDir, agentName);
+      if (!fs.statSync(agentDir).isDirectory()) continue;
+
+      const oldAgentUnits = path.join(agentDir, '.memgrid', 'units');
+      const newAgentUnits = path.join(agentDir, 'units');
+      if (fs.existsSync(oldAgentUnits)) {
+        fs.mkdirSync(newAgentUnits, { recursive: true });
+        for (const file of fs.readdirSync(oldAgentUnits)) {
+          if (!file.endsWith('.json')) continue;
+          const src = path.join(oldAgentUnits, file);
+          const dst = path.join(newAgentUnits, file);
+          if (!fs.existsSync(dst)) {
+            fs.copyFileSync(src, dst);
+            movedAgent++;
+          }
+        }
+      }
+
+      // Also migrate archive if exists
+      const oldAgentArchive = path.join(agentDir, '.memgrid', 'archive');
+      const newAgentArchive = path.join(agentDir, 'archive');
+      if (fs.existsSync(oldAgentArchive)) {
+        fs.mkdirSync(newAgentArchive, { recursive: true });
+        const walkCopy = (srcDir: string, dstDir: string) => {
+          if (!fs.existsSync(srcDir)) return;
+          for (const entry of fs.readdirSync(srcDir)) {
+            const s = path.join(srcDir, entry);
+            const d = path.join(dstDir, entry);
+            if (fs.statSync(s).isDirectory()) {
+              fs.mkdirSync(d, { recursive: true });
+              walkCopy(s, d);
+            } else if (entry.endsWith('.json') && !fs.existsSync(d)) {
+              fs.copyFileSync(s, d);
+              movedAgent++;
+            }
+          }
+        };
+        walkCopy(oldAgentArchive, newAgentArchive);
+      }
+    }
+  }
+
+  if (movedPersonality > 0 || movedAgent > 0) {
+    console.log(
+      `  📦 Path migration: ${movedPersonality} personality + ${movedAgent} agent unit(s) moved`,
+    );
+    console.log(
+      '     Old files preserved — remove ~/.memgrid/.memgrid/ and sessions/*/.memgrid/ when ready',
+    );
+  }
 }

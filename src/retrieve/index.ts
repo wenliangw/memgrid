@@ -72,10 +72,16 @@ export class RetrieveEngine {
 
   /**
    * Incremental index update — call when a single unit is added/updated.
+   * Only calls remove() before add() if the unit was previously indexed.
    */
   updateIndex(unit: MemoryUnit): void {
     if (!this.index) return;
-    this.index.remove(unit.id as any);
+    // Only try to remove if the unit might already be indexed (not on first add)
+    try {
+      this.index.remove(unit.id as any);
+    } catch {
+      // Unit not in index yet — that's fine for a new add
+    }
     this.index.add({
       id: unit.id,
       summary: unit.summary,
