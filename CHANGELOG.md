@@ -2,6 +2,21 @@
 
 All notable changes to MemGrid.
 
+## v0.11.0 — V2 Complete: Undo, Time Decay, Git Sync, Cross-Domain, Forgetting, LLM Intent, Image Memory (2026-07-02)
+
+### Added
+- **Undo/Rollback**: Automatic backup on every write (insert/update/delete/archive) to `.memgrid/backups/`. `memgrid undo <id>` restores latest snapshot as `candidate`. `memgrid undo --list` shows all available backups. (#76)
+- **Time Decay**: `freshness_score` field on `MemoryUnit.meta` with exponential decay (half-life ~14 days, tier-adjusted). `touch()` boosts freshness on access. Search scores incorporate freshness × tier factor. (#77)
+- **`--server` → `--openclaw` rename**: `--openclaw` is now the primary flag; `--server` remains as deprecated alias with warning. (#78)
+- **Git Diff Sync**: `syncFromGitDiff()` uses `git diff --name-status` to detect changes, 10-100x faster for large repos. Falls back to hash sync when not a git repo. (#79)
+- **Cross-Domain Search**: `crossDomainSearch()` searches multiple MemGrid domains, merges and dedupes results, returns per-domain breakdown. (#79)
+- **Auto-Forgetting Detection**: `detectForgettable()` identifies stale/cold/broken/low-confidence units with four criteria. Optional `autoArchive` mode. (#79)
+- **LLM Retrieval Protocol**: `SearchOptions.intent` — `quick_lookup`, `explore`, `audit`, `deep_dive` — adjusts maxResults, hops, semantic weight, and tier inclusion automatically. (#80)
+- **Image Memory**: `MemoryUnit.image` metadata field (key, alt, ocrText, mimeType, dimensions). `addImage()` and `searchImages()` for text-based image retrieval. (#80)
+
+### Fixed
+- Duplicate `--openclaw` flag causing startup crash (#81)
+
 ## v0.10.3 — Fix Version Detection in nvm (2026-07-01)
 
 ### Fixed
