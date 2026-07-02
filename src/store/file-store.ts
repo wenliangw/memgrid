@@ -11,6 +11,7 @@ import { LEGACY_TYPE_MAP } from '../shared/types.js';
 const GRID_DIR = '.memgrid';
 const UNITS_DIR = 'units';
 const ARCHIVE_DIR = 'archive';
+const BACKUP_DIR = 'backups';
 const MESH_FILE = 'mesh.json';
 
 /** Check if a directory is already a MemGrid root by looking for units/ or mesh.json */
@@ -60,6 +61,9 @@ export class FileStore {
   get archiveDir(): string {
     return path.join(this.gridDir, ARCHIVE_DIR);
   }
+  get backupDir(): string {
+    return path.join(this.gridDir, BACKUP_DIR);
+  }
   get meshPath(): string {
     return path.join(this.gridDir, MESH_FILE);
   }
@@ -80,6 +84,7 @@ export class FileStore {
   ensureDirs(): void {
     fs.mkdirSync(this.unitsDir, { recursive: true });
     fs.mkdirSync(this.archiveDir, { recursive: true });
+    fs.mkdirSync(this.backupDir, { recursive: true });
   }
 
   /**
@@ -241,6 +246,9 @@ export class FileStore {
     const unit = this.cache.get(id);
     if (!unit) return;
 
+    // Backup before archive
+    this.backupUnit(unit, 'archive');
+
     const fromPath = this.unitPath(id);
     const toPath = this.archivePath(id);
 
@@ -253,6 +261,88 @@ export class FileStore {
 
     this.cache.delete(id);
     this.archiveCache.set(id, unit);
+  }
+
+  // ===== Undo / Backup =====
+
+  /**
+   * Back up a unit before a destructive write (insert/update/delete/archive).
+   * Saves a snapshot to .memgrid/backups/{unitId}.backup.{timestamp}.json
+   */
+  backupUnit(unit: MemoryUnit, operation: 'insert' | 'update' | 'delete' | 'archive'): void {
+    const ts = Date.now();
+    const backupId = `${unit.id}.backup.${ts}`;
+    const backupPath = path.join(this.backupDir, `${backupId}.json`);
+
+    const snapshot = {
+      ...unit,
+      _backup_meta: {
+        backupTime: new Date(ts).toISOString(),
+        operation,
+        unitId: unit.id,
+      },
+    };
+
+    fs.writeFileSync(backupPath, JSON.stringify(snapshot, null, 2), 'utf-8');
+  }
+
+  /**
+   * List all available backups with metadata.
+   */
+  listBackups(): Array<{ unitId: string; backupTime: string; operation: string }> {
+    const results: Array<{ unitId: string; backupTime: string; operation: string }> = [];
+
+    if (!fs.existsSync(this.backupDir)) return results;
+
+    for (const file of fs.readdirSync(this.backupDir)) {
+      if (!file.endsWith('.json')) continue;
+      try {
+        const content = fs.readFileSync(path.join(this.backupDir, file), 'utf-8');
+        const data = JSON.parse(content);
+        if (data._backup_meta) {
+          results.push({
+            unitId: data._backup_meta.unitId,
+            backupTime: data._backup_meta.backupTime,
+            operation: data._backup_meta.operation,
+          });
+        }
+      } catch {
+        // skip unparseable files
+      }
+    }
+
+    // Sort newest first
+    results.sort((a, b) => new Date(b.backupTime).getTime() - new Date(a.backupTime).getTime());
+    return results;
+  }
+
+  /**
+   * Find the latest backup for a given unit ID.
+   */
+  findLatestBackup(unitId: string): MemoryUnit | null {
+    if (!fs.existsSync(this.backupDir)) return null;
+
+    let latest: { ts: number; unit: MemoryUnit } | null = null;
+
+    for (const file of fs.readdirSync(this.backupDir)) {
+      if (!file.startsWith(unitId) || !file.endsWith('.json')) continue;
+      try {
+        const content = fs.readFileSync(path.join(this.backupDir, file), 'utf-8');
+        const data = JSON.parse(content);
+        if (data._backup_meta?.unitId === unitId) {
+          const ts = new Date(data._backup_meta.backupTime).getTime();
+          if (!latest || ts > latest.ts) {
+            // Remove _backup_meta before returning
+            const { _backup_meta, ...unit } = data;
+            latest = { ts, unit };
+          }
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    return latest?.unit || null;
   }
 
   touch(id: string): void {

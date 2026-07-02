@@ -588,6 +588,45 @@ program
   });
 
 program
+  .command('undo')
+  .description('Restore a memory unit from the latest backup (restored as candidate)')
+  .argument('[id]', 'Unit ID to restore. Omit to list all available backups.')
+  .option('-l, --list', 'List all available backup snapshots')
+  .action(async (id, options) => {
+    const mg = new MemGrid(process.cwd());
+
+    if (options.list || !id) {
+      const backups = await mg.listUndo();
+      if (backups.length === 0) {
+        console.log('📭 No backups available.');
+        return;
+      }
+      console.log(`📦 ${backups.length} backup(s) available:\n`);
+      for (const b of backups) {
+        const opIcons: Record<string, string> = {
+          insert: '➕',
+          update: '✏️',
+          delete: '🗑️',
+          archive: '📦',
+        };
+        console.log(`  ${opIcons[b.operation] || '❓'} ${b.unitId}`);
+        console.log(`     ${b.operation} at ${b.backupTime}`);
+      }
+      console.log(`\n  Restore: memgrid undo <unitId>`);
+      return;
+    }
+
+    const restored = await mg.undo(id);
+    if (restored) {
+      console.log(`✅ Restored: [${restored.id}] ${restored.summary.slice(0, 80)}`);
+      console.log('   Status: candidate (review required before searchable)');
+      console.log('   Run: memgrid review --accept ' + restored.id + '  to confirm');
+    } else {
+      console.log(`❌ No backup found for: ${id}`);
+    }
+  });
+
+program
   .command('rebalance')
   .description('Rebalance memory units across hot/warm/cold/frozen tiers')
   .action(async () => {

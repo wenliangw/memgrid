@@ -224,6 +224,11 @@ export class MemGrid {
     };
 
     this.store.ensureDirs();
+    // Backup before insert (if a unit with this ID already exists — upsert case)
+    const existing = this.store.getUnit(fullUnit.id);
+    if (existing) {
+      this.store.backupUnit(existing, 'insert');
+    }
     this.store.saveUnit(fullUnit);
     this.retrieve.updateIndex(fullUnit);
     return fullUnit;
@@ -347,6 +352,9 @@ export class MemGrid {
     const unit = this.store.getUnit(id);
     if (!unit) return null;
 
+    // Backup before update
+    this.store.backupUnit({ ...unit }, 'update');
+
     Object.assign(unit, patch);
     unit.meta.updated = new Date().toISOString();
 
@@ -357,6 +365,33 @@ export class MemGrid {
   async archive(id: string): Promise<void> {
     this.store.archiveUnit(id);
     this.retrieve.invalidateIndex();
+  }
+
+  // ===== Undo / Rollback (v0.11+) =====
+
+  /**
+   * Restore a unit from the latest backup.
+   * The restored unit is set to 'candidate' status for safety — it must be
+   * reviewed and accepted before it becomes searchable.
+   */
+  async undo(id: string): Promise<MemoryUnit | null> {
+    const backup = this.store.findLatestBackup(id);
+    if (!backup) return null;
+
+    // Restore as candidate for safety — must be re-reviewed
+    backup.meta.status = 'candidate';
+    backup.meta.updated = new Date().toISOString();
+
+    this.store.ensureDirs();
+    this.store.saveUnit(backup);
+    return backup;
+  }
+
+  /**
+   * List all available backup snapshots.
+   */
+  async listUndo(): Promise<Array<{ unitId: string; backupTime: string; operation: string }>> {
+    return this.store.listBackups();
   }
 
   // ===== Tiered Storage Engine (v0.9+) =====
