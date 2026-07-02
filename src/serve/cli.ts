@@ -200,6 +200,9 @@ program
         const firstAgentSessionPath =
           agents.length > 0 ? path.join(dm.gridDir, 'sessions', agents[0].name) : undefined;
         registerOpenClawMcp(openclawJsonPath, firstAgentSessionPath);
+
+        // Auto-register MemGrid auto-memory plugin in OpenClaw
+        registerMemGridPlugin(openclawJsonPath);
       }
 
       console.log('\n✅ Server initialization complete.');
@@ -1878,5 +1881,66 @@ function migrateNestedPaths(dm: DomainManager): void {
     console.log(
       '     Old files preserved — remove ~/.memgrid/.memgrid/ and sessions/*/.memgrid/ when ready',
     );
+  }
+}
+
+/**
+ * Auto-register MemGrid auto-memory plugin in OpenClaw Gateway.
+ *
+ * Writes a plugin entry into the Gateway's openclaw.json config that
+ * subscribes to `agent_end` hook — automatically extracting memories
+ * from every conversation turn via memgrid_extract.
+ */
+function registerMemGridPlugin(configPath: string): void {
+  if (!fs.existsSync(configPath)) {
+    console.log('  ⚠️  openclaw.json not found — skip plugin registration');
+    return;
+  }
+
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+    if (!config.plugins) config.plugins = {};
+    if (!config.plugins.load) config.plugins.load = { paths: [] };
+    if (!config.plugins.entries) config.plugins.entries = {};
+
+    // Check if already registered
+    if (config.plugins.entries['memgrid-agent']) {
+      console.log('  📎 openclaw.json: MemGrid plugin already registered');
+      return;
+    }
+
+    // Determine plugin path
+    const pluginPath = path.join(
+      require.main?.filename ?? __dirname,
+      '..',
+      '..',
+      '..',
+      '..',
+      'memgrid-plugin',
+    );
+    // Normalize: if we can't resolve, use a standard path
+    const resolvedPluginPath = fs.existsSync(pluginPath)
+      ? pluginPath.replaceAll('\\', '/')
+      : '~/.memgrid/extensions/memgrid-agent';
+
+    // Add plugin load path
+    if (!config.plugins.load.paths.includes(resolvedPluginPath)) {
+      config.plugins.load.paths.push(resolvedPluginPath);
+    }
+
+    // Add plugin entry
+    config.plugins.entries['memgrid-agent'] = {
+      enabled: true,
+      hooks: {
+        allowConversationAccess: true,
+      },
+    };
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+    console.log('  📎 openclaw.json: MemGrid auto-memory plugin registered');
+    console.log('     → Restart OpenClaw Gateway to activate');
+  } catch {
+    console.log('  ⚠️  Could not parse openclaw.json — add plugin manually');
   }
 }

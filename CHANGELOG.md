@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.11.2 — Auto-Memory OpenClaw Plugin (2026-07-03)
+
+### Added
+- **OpenClaw auto-memory plugin** (): Uses the  hook to automatically extract and save conversation memories after every agent turn. No manual / needed.
+- ****: 📦 Project domain: memgrid (project)
+   /home/7c/memgrid/.memgrid
+
+🔍 Scanning project (typescript, python, markdown, config)...
+
+📊 Scan complete!
+
+Units generated:
+  fact: 119
+  insight: 12
+
+  Total: 131 units
+  Storage: .memgrid/
+  CLAUDE.md: MemGrid block updated (old → new)
+  .memgrid/README.md: created — guidance for AI tools
+
+🧠 Domain registered in your cognitive grid (~/.memgrid/)
+
+✅ Project domain initialized. Ready.
+   memgrid search "your task"  —  search domain memory
+   memgrid review              —  review candidate memories
+   memgrid stats               —  domain statistics now auto-registers the MemGrid agent plugin in the Gateway's  config, alongside existing MCP registration.
+- Plugin triggers  on each successful agent turn, then auto-accepts high-confidence candidates. Errors do not block agent responses.
+
 All notable changes to MemGrid.
 
 ## v0.11.1 — Lifecycle Pipeline: Auto-Rebalance, Freshness Bootstrap, Forgetting Integration (2026-07-02)
