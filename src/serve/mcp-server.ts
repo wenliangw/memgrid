@@ -437,6 +437,7 @@ export class MemGridServer {
             const { sourceFile, codeSnippet, _styleNotes, associations, status, domain } =
               args as any;
             let { type } = args as any;
+            const target = this.resolveDomain(domain);
 
             // NLP auto-detect: if no type provided, parse from description
             if (!type && summary) {
@@ -466,7 +467,7 @@ export class MemGridServer {
 
             const id = type + '_' + Date.now();
             const isActive = status === 'active';
-            const unit = await this.mg.add({
+            const unit = await target.add({
               id,
               type: type,
               domain: domain || undefined,
@@ -774,6 +775,7 @@ export class MemGridServer {
           case 'memgrid_update': {
             const { unitId, type, summary, description, domain, keywords, confidence, status } =
               args as any;
+            const target = this.resolveDomain(domain);
             const patch: any = {};
             if (type) patch.type = type;
             if (summary) patch.summary = summary;
@@ -783,7 +785,7 @@ export class MemGridServer {
             if (confidence !== undefined) patch.meta = { confidence };
             if (status) patch.meta = { ...patch.meta, status };
 
-            const unit = await this.mg.update(unitId, patch);
+            const unit = await target.update(unitId, patch);
             if (unit) {
               return {
                 content: [
