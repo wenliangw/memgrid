@@ -19,7 +19,7 @@ import { injectHooks } from '../hooks.js';
 import { parseMemoryInput, createMemoryUnit } from '../learn/nlp.js';
 import { DomainManager } from '../domain/domain-manager.js';
 import { LibraryManager } from '../library/index.js';
-import type { MemoryUnit, MemoryUnitType, LibraryUnit } from '../shared/types.js';
+import type { MemoryUnit, MemoryUnitType, MemoryTier, LibraryUnit } from '../shared/types.js';
 
 const program = new Command();
 
@@ -41,6 +41,7 @@ program
   .option('--no-examples', 'Skip scanning .claude/examples/')
   .option('--server', 'Initialize in OpenClaw server mode')
   .option('--openclaw', 'Generate OpenClaw Gateway config')
+  .option('--lang <lang>', 'Language environment: en (default) or zh')
   .action(async (options) => {
     const root = process.cwd();
     const dm = new DomainManager();
@@ -144,6 +145,13 @@ program
           }
           console.log(`     📁 Original files preserved (not deleted)`);
         }
+      }
+
+      // Inject metacognitive anchor memory for each agent domain
+      const lang = options.lang === 'zh' ? 'zh' : 'en';
+      for (const agent of agents) {
+        const sessionDir = path.join(dm.gridDir, 'sessions', agent.name);
+        injectMetacognitiveAnchor(sessionDir, lang);
       }
 
       // Generate OpenClaw Gateway config
@@ -1679,4 +1687,65 @@ function injectMemGridAgentsBlock(agentsMdPath: string, agentName: string): void
 
   fs.appendFileSync(agentsMdPath, blockText, 'utf-8');
   console.log(`     AGENTS.md: MemGrid block injected for ${agentName}`);
+}
+
+/**
+ * Inject a metacognitive anchor memory unit into an agent's MemGrid domain.
+ *
+ * This unit serves as a "memory iron law" — every Agent that boots with
+ * this in its memory domain knows it MUST actively write memories after
+ * each conversation turn. It is the lowest-level guarantee of the memory system.
+ *
+ * Injected once during `memgrid init --server`. Already-existing agent domains
+ * are skipped (no duplicate injection).
+ */
+function injectMetacognitiveAnchor(sessionDir: string, lang: 'en' | 'zh') {
+  const mg = new MemGrid(sessionDir);
+  mg.store.ensureDirs();
+  mg.store.load();
+
+  // Check if anchor already exists (prevent duplicates)
+  const existing = mg.store
+    .listUnitsSync()
+    .filter(
+      (u) => u.summary?.includes('元认知铁律') || u.summary?.includes('Metacognitive Iron Law'),
+    );
+  if (existing.length > 0) {
+    return; // already injected
+  }
+
+  const isEn = lang === 'en';
+  const timestamp = Date.now();
+  const anchorUnit: MemoryUnit = {
+    id: `anchor_meta_${timestamp}`,
+    type: 'preference' as MemoryUnitType,
+    domain: 'cognition',
+    summary: isEn
+      ? '🔴 Metacognitive Iron Law: Actively write memories after EVERY conversation turn'
+      : '🔴 元认知铁律：每轮对话后必须立即主动写入记忆',
+    narrative: isEn
+      ? 'After every substantive conversation turn with the user, you MUST immediately call memgrid_add to write down anything worth remembering. Trigger conditions include: decisions, new facts, preference changes, events, discussion conclusions. Do NOT wait, do NOT batch, do NOT rely on user reminder. This is the lowest-level safeguard of the memory system.'
+      : '每轮和用户的实质性对话结束后，必须立刻调用 memgrid_add 写入值得记住的信息。触发条件包括：决策、新事实、偏好变更、事件、讨论结论。不等、不攒、不依赖用户提醒。这是记忆系统最底层保障。',
+    keywords: isEn
+      ? ['metacognitive', 'iron-law', 'memory', 'write', 'every-turn', 'memgrid_add']
+      : ['元认知', '铁律', '记忆', '写入', '每轮', 'memgrid_add'],
+    signatures: [],
+    associations: [],
+    meta: {
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      confidence: 1.0,
+      usage_count: 0,
+      status: 'active',
+      tier: 'hot' as MemoryTier,
+    },
+    provenance: {
+      createdBy: 'memgrid:init-anchor',
+      basedOnTask: 'Initial metacognitive anchor injection',
+      timestamp: new Date().toISOString(),
+    },
+  };
+
+  mg.store.saveUnit(anchorUnit);
+  console.log(`     🧠 Metacognitive anchor injected (${lang})`);
 }

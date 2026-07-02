@@ -2,3 +2,8 @@ dist/
 node_modules/
 .claude/memory-grid/
 *.tsbuildinfo
+
+# MemGrid personal memory (not shared)
+.memgrid/personal/
+.memgrid/
+!tests/fixtures/.memgrid/
