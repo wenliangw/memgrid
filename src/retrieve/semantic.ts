@@ -162,7 +162,7 @@ export class SemanticRetriever {
       }
     }
 
-    // Step 4: Apply tier weights (v0.9+) and sort
+    // Step 4: Apply tier weights (v0.9+) and freshness decay (v0.11+) — then sort
     const tiers = options?.tiers || ['hot', 'warm', 'cold'];
     const tierWeights: Record<string, number> = {
       hot: 1.0,
@@ -178,7 +178,13 @@ export class SemanticRetriever {
         if (!tiers.includes(tier)) {
           merged.delete(id);
         } else {
-          merged.set(id, score * (tierWeights[tier] ?? 0.7));
+          // Tier weight
+          let finalScore = score * (tierWeights[tier] ?? 0.7);
+          // Freshness decay (v0.11+): cold tier decays faster (×0.9), hot tier decays slower (×1.0)
+          const freshness = unit.meta.freshness_score ?? 0.5;
+          const tierDecayFactor = tier === 'hot' ? 1.0 : tier === 'warm' ? 0.85 : 0.7;
+          finalScore *= 0.5 + 0.5 * freshness * tierDecayFactor;
+          merged.set(id, finalScore);
         }
       }
     }

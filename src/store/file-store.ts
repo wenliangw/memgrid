@@ -350,7 +350,10 @@ export class FileStore {
     const unit = this.cache.get(id) || this.archiveCache.get(id);
     if (unit) {
       unit.meta.usage_count++;
-      unit.meta.lastAccessedAt = new Date().toISOString();
+      const now = new Date().toISOString();
+      unit.meta.lastAccessedAt = now;
+      // Boost freshness on access: cap at 1.0
+      unit.meta.freshness_score = Math.min(1.0, (unit.meta.freshness_score ?? 0.5) + 0.05);
       this.dirtyUsage.add(id);
     }
   }

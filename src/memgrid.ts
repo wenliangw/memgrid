@@ -218,6 +218,7 @@ export class MemGrid {
         updated: new Date().toISOString(),
         confidence: unit.meta?.confidence ?? 0.7,
         usage_count: 0,
+        freshness_score: 1.0,
         status: unit.meta?.status ?? 'candidate',
       },
       provenance: unit.provenance,
@@ -435,7 +436,7 @@ export class MemGrid {
       thawedCount: 0,
     };
 
-    // Phase 1: Assign tiers based on access patterns
+    // Phase 1: Assign tiers based on access patterns AND compute freshness_score
     const coldCandidates: MemoryUnit[] = [];
 
     for (const unit of activeUnits) {
@@ -443,6 +444,13 @@ export class MemGrid {
       const accessedAt = unit.meta.lastAccessedAt
         ? new Date(unit.meta.lastAccessedAt)
         : new Date(unit.meta.updated);
+
+      // Compute freshness_score: 1.0 (now) → 0.0 (90 days+ ago)
+      const daysSinceAccess = (now.getTime() - accessedAt.getTime()) / (24 * 60 * 60 * 1000);
+      // Exponential decay: half-life ~14 days. Multiply by tier factor.
+      const tierDecayFactor =
+        unit.meta.tier === 'hot' ? 1.5 : unit.meta.tier === 'warm' ? 1.0 : 0.5;
+      unit.meta.freshness_score = Math.max(0, Math.exp(-daysSinceAccess / (14 * tierDecayFactor)));
 
       let newTier: MemoryTier;
 
