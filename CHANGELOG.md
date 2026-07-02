@@ -2,6 +2,13 @@
 
 All notable changes to MemGrid.
 
+## v0.11.1 — Lifecycle Pipeline: Auto-Rebalance, Freshness Bootstrap, Forgetting Integration (2026-07-02)
+
+### Added
+- **Auto-rebalance trigger**: Rebalance runs automatically every 24 hours or every 100 searches from `search()`. No manual intervention needed. (#83)
+- **Freshness bootstrapping**: Units migrated before v0.11 that lack `freshness_score` now get one computed via exponential decay from `lastAccessedAt` → `updated` → `created`. (#83)
+- **`runLifecycle()`**: Orchestrates bootstrap → rebalance → `detectForgettable(autoArchive=true)` in one call. Forgetting is now part of the natural pipeline, not a manual step. (#83)
+
 ## v0.11.0 — V2 Complete: Undo, Time Decay, Git Sync, Cross-Domain, Forgetting, LLM Intent, Image Memory (2026-07-02)
 
 ### Added
