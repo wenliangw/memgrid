@@ -1,6 +1,6 @@
 {
   "name": "memgrid",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "Project-level semantic memory system for AI coding agents. Replaces full-codebase context loading with a self-evolving knowledge-mesh.",
   "type": "module",
   "main": "dist/index.js",

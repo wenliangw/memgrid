@@ -2,6 +2,27 @@
 
 All notable changes to MemGrid.
 
+## v0.10.4 — Path Nesting + Domain Routing + Index Update (2026-07-02)
+
+### Fixed
+- **`.memgrid/` path nesting**: `FileStore` no longer blindly appends `.memgrid/` to `projectRoot`.
+  When the target directory is already a MemGrid grid root (contains `units/` or `mesh.json`),
+  it uses the directory directly without nesting. Fixes `~/.memgrid/.memgrid/units/` and
+  `~/.memgrid/sessions/{agent}/.memgrid/units/` double-nesting.
+- **Domain routing in `memgrid_add` / `memgrid_update`**: MCP server now calls
+  `resolveDomain(domain)` before routing write operations, matching the behavior of
+  `memgrid_search` and other tools. Previously writes always went to the default instance,
+  causing write/read path mismatch and making newly written units unfindable by search.
+- **Index not updated after `add()` / `acceptCandidate()`**: Newly written memory units are
+  now immediately searchable — `add()`, `acceptCandidate()`, and `archive()` all update or
+  invalidate the retrieval index after writing.
+- **`RetrieveEngine.updateIndex()` crash on first add**: Handles the case where a unit is
+  not yet in the index (no-op `remove()` before `add()`) without throwing.
+
+### Added
+- **Data migration in `init --server`**: Automatically migrates units from old nested paths
+  to correct locations, preserving original files.
+
 ## v0.10.3 — Fix Version Detection in nvm (2026-07-01)
 
 ### Fixed
