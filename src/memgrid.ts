@@ -45,6 +45,11 @@ export class MemGrid {
   library: LibraryManager;
   extract: ExtractEngine;
   projectRoot: string;
+  // Lifecycle pipeline (v0.11.1+)
+  private searchCount = 0;
+  private lastRebalanceTime = 0;
+  private readonly REBALANCE_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
+  private readonly REBALANCE_SEARCH_THRESHOLD = 100; // every 100 searches
 
   constructor(projectRoot: string, provider?: EmbeddingProvider, scanner?: Scanner) {
     this.projectRoot = projectRoot;
@@ -189,6 +194,17 @@ export class MemGrid {
     // Touch usage counts for retrieved units (in-memory, periodically flushed)
     for (const unit of result.units) {
       this.store.touch(unit.id);
+    }
+    // Lifecycle pipeline: auto-rebalance on interval or after N searches (v0.11.1+)
+    this.searchCount++;
+    const now = Date.now();
+    if (
+      this.searchCount >= this.REBALANCE_SEARCH_THRESHOLD ||
+      now - this.lastRebalanceTime >= this.REBALANCE_INTERVAL_MS
+    ) {
+      this.searchCount = 0;
+      this.lastRebalanceTime = now;
+      await this.runLifecycle();
     }
     return result;
   }
@@ -411,6 +427,65 @@ export class MemGrid {
    *
    * Candidate units are excluded from tiering.
    */
+
+  /**
+   * Full lifecycle pipeline: rebalance tiers → bootstrap freshness for old units →
+   * detect and clean forgettable memories (v0.11.1+).
+   *
+   * Called automatically on interval (24h) or every 100 searches.
+   */
+  async runLifecycle(): Promise<{
+    rebalance: RebalanceResult;
+    cleanup: { candidates: number; archived: number };
+  }> {
+    this.store.load();
+
+    // Step 1: Bootstrap freshness for units that lack it (migrated pre-v0.11 data)
+    this.bootstrapFreshness();
+
+    // Step 2: Rebalance tiers + compute current freshness
+    const rebResult = await this.rebalance();
+
+    // Step 3: Auto-forget stale/cold/broken units
+    const forgetResult = await this.detectForgettable({
+      minDaysStale: 60,
+      autoArchive: true,
+    });
+
+    return {
+      rebalance: rebResult,
+      cleanup: { candidates: forgetResult.candidates.length, archived: forgetResult.autoArchived },
+    };
+  }
+
+  /**
+   * Bootstrap freshness_score for units that were migrated before v0.11 and
+   * have no freshness_score set. Uses lastAccessedAt or updated as reference.
+   */
+  private bootstrapFreshness(): void {
+    const allUnits = this.store.listUnitsSync({ includeCandidate: true }) || [];
+    const now = Date.now();
+    let _bootstrapped = 0;
+
+    for (const unit of allUnits) {
+      if (unit.meta.status === 'archived' || unit.meta.status === 'candidate') continue;
+      if (unit.meta.freshness_score != null) continue;
+
+      // Use lastAccessedAt if available, fall back to updated, fall back to created
+      const refTime = unit.meta.lastAccessedAt
+        ? new Date(unit.meta.lastAccessedAt).getTime()
+        : unit.meta.updated
+          ? new Date(unit.meta.updated).getTime()
+          : new Date(unit.meta.created).getTime();
+
+      const daysSince = (now - refTime) / (24 * 60 * 60 * 1000);
+      // Half-life ~14 days, warm tier baseline
+      unit.meta.freshness_score = Math.max(0, Math.exp(-daysSince / 14));
+      this.store.saveUnit(unit);
+      _bootstrapped++;
+    }
+  }
+
   async rebalance(): Promise<RebalanceResult> {
     this.store.load();
     const allUnits = this.store.listUnitsSync({ includeCandidate: true }) || [];
