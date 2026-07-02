@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostCompletion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SYNC_LOG=\".memgrid/sync.log\"\nmkdir -p \"$(dirname \"$SYNC_LOG\")\"\necho \"[$(date -Iseconds)] [$(hostname)] SYNC_START\" >> \"$SYNC_LOG\"\nif npx memgrid sync --quiet; then\n  echo \"[$(date -Iseconds)] [$(hostname)] SYNC_SUCCESS\" >> \"$SYNC_LOG\"\nelse\n  EXIT_CODE=$?\n  echo \"[$(date -Iseconds)] [$(hostname)] SYNC_FAILURE exit=$EXIT_CODE\" >> \"$SYNC_LOG\"\n  echo \"⚠️  memgrid sync failed (exit $EXIT_CODE) — see $SYNC_LOG for details\" >&2\nfi"
+          }
+        ]
+      }
+    ]
+  }
+}

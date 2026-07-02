@@ -38,6 +38,8 @@ export interface SemanticSearchOptions {
   semanticWeight?: number;
   /** Limit search to specific tiers (v0.9+) */
   tiers?: string[];
+  /** LLM retrieval intent: determines strategy (v0.13+) */
+  intent?: 'quick_lookup' | 'explore' | 'audit' | 'deep_dive';
 }
 
 export class SemanticRetriever {
